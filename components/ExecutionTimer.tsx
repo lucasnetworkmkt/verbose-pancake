@@ -8,10 +8,10 @@ interface ExecutionTimerProps {
 }
 
 const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTimer }) => {
-  // Local inputs for setup
-  const [hours, setHours] = useState(0);
-  const [minutes, setMinutes] = useState(0);
-  const [seconds, setSeconds] = useState(0);
+  // Local inputs for setup - using strings to allow empty state while typing
+  const [hours, setHours] = useState('00');
+  const [minutes, setMinutes] = useState('00');
+  const [seconds, setSeconds] = useState('00');
   const [deliverableInput, setDeliverableInput] = useState('');
   
   // Real-time display
@@ -72,7 +72,11 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
   };
 
   const handleStart = () => {
-    const totalSec = (hours * 3600) + (minutes * 60) + (seconds * 1);
+    const h = parseInt(hours || '0', 10);
+    const m = parseInt(minutes || '0', 10);
+    const s = parseInt(seconds || '0', 10);
+    
+    const totalSec = (h * 3600) + (m * 60) + s;
     if (totalSec <= 0 || !deliverableInput.trim()) return;
 
     onUpdateTimer({
@@ -124,6 +128,28 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Helper to strictly enforce limits on typing
+  const handleInputChange = (
+    value: string, 
+    setter: (val: string) => void, 
+    max: number
+  ) => {
+    // Allow empty string for better UX (deleting)
+    if (value === '') {
+        setter('');
+        return;
+    }
+    
+    // Only allow numbers
+    const num = parseInt(value, 10);
+    if (isNaN(num)) return;
+
+    // Strict clamping
+    if (num < 0) setter('00');
+    else if (num > max) setter(max.toString().padStart(2, '0'));
+    else setter(num.toString().padStart(2, '0'));
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto px-2 md:px-0">
        <div className="bg-app-card border border-app-gold/30 rounded-lg shadow-2xl overflow-hidden relative">
@@ -146,35 +172,38 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                         <div className="flex gap-2 md:gap-4 justify-center">
                              <div className="flex flex-col items-center">
                                 <input 
-                                    type="number" 
-                                    min="0" max="23"
+                                    type="text" 
+                                    inputMode="numeric"
                                     value={hours}
-                                    onChange={e => setHours(Number(e.target.value))}
+                                    onChange={e => handleInputChange(e.target.value, setHours, 23)}
+                                    onBlur={() => setHours(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
                                     className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Horas</span>
+                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Horas (Max 23)</span>
                              </div>
                              <span className="text-2xl md:text-3xl text-gray-600 mt-6">:</span>
                              <div className="flex flex-col items-center">
                                 <input 
-                                    type="number" 
-                                    min="0" max="59"
+                                    type="text"
+                                    inputMode="numeric"
                                     value={minutes}
-                                    onChange={e => setMinutes(Number(e.target.value))}
+                                    onChange={e => handleInputChange(e.target.value, setMinutes, 59)}
+                                    onBlur={() => setMinutes(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
                                     className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Min</span>
+                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Min (Max 59)</span>
                              </div>
                              <span className="text-2xl md:text-3xl text-gray-600 mt-6">:</span>
                              <div className="flex flex-col items-center">
                                 <input 
-                                    type="number" 
-                                    min="0" max="59"
+                                    type="text"
+                                    inputMode="numeric" 
                                     value={seconds}
-                                    onChange={e => setSeconds(Number(e.target.value))}
+                                    onChange={e => handleInputChange(e.target.value, setSeconds, 59)}
+                                    onBlur={() => setSeconds(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
                                     className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Seg</span>
+                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Seg (Max 59)</span>
                              </div>
                         </div>
                     </div>
@@ -191,7 +220,7 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
 
                     <button 
                         onClick={handleStart}
-                        disabled={!deliverableInput.trim() || (hours === 0 && minutes === 0 && seconds === 0)}
+                        disabled={!deliverableInput.trim() || (parseInt(hours) === 0 && parseInt(minutes) === 0 && parseInt(seconds) === 0)}
                         className="w-full bg-app-red hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-5 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 text-lg"
                     >
                         <Play size={20} fill="currentColor" />

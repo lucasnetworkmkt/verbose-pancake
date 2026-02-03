@@ -12,7 +12,7 @@ export default defineConfig({
     'process.env': {}
   },
   build: {
-    // Evita que erros de Typescript bloqueiem o build de produção no Vercel
-    // typescript: { ignoreBuildErrors: true } - REMOVED: Invalid property in Vite build config
+    // Aumenta o limite de aviso de tamanho de chunk para evitar warnings desnecessários
+    chunkSizeWarningLimit: 1000
   }
 });

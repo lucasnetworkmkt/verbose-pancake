@@ -1,26 +1,5 @@
 import { AppState, User } from '../types';
-
-const STORAGE_KEY = 'CODIGO_EXECUCAO_DB_LOCAL_V2';
-
-// --- MOCK DATABASE (LOCAL STORAGE) ---
-// Estrutura para salvar múltiplos usuários no mesmo navegador
-interface LocalDB {
-  users: Record<string, {
-    user: User;
-    password?: string; // Salva senha apenas localmente para simular login
-    data: Omit<AppState, 'user'>;
-  }>;
-}
-
-// Helpers
-const getLocalDB = (): LocalDB => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : { users: {} };
-};
-
-const saveLocalDB = (db: LocalDB) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-};
+import { supabase } from './supabase';
 
 // Helper for initial state creation
 const createInitialState = (): Omit<AppState, 'user'> => ({
@@ -55,61 +34,132 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
 
 export const authService = {
   login: async (email: string, password: string): Promise<AppState | null> => {
-    // Simula delay de rede
-    await new Promise(resolve => setTimeout(resolve, 600));
+    // 1. Autenticação real com Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-    const db = getLocalDB();
-    // Procura usuário pelo email (case insensitive para email)
-    const userEntry = Object.values(db.users).find((u: any) => u.user.email.toLowerCase() === email.toLowerCase());
-
-    if (userEntry && userEntry.password === password) {
-      return { ...userEntry.data, user: userEntry.user };
+    if (authError) {
+      if (authError.message.includes("Invalid login credentials")) {
+        throw new Error("Email ou senha incorretos.");
+      }
+      if (authError.message.includes("Email not confirmed")) {
+        throw new Error("Email não confirmado. Verifique sua caixa de entrada ou desative a confirmação no Supabase.");
+      }
+      throw new Error(authError.message);
     }
 
-    throw new Error("Credenciais inválidas. Verifique seu email e senha.");
+    if (!authData.user) {
+      throw new Error("Erro desconhecido ao realizar login.");
+    }
+
+    // 2. Buscar dados do aplicativo no banco
+    const { data: dbData, error: dbError } = await supabase
+      .from('app_data')
+      .select('data')
+      .eq('user_id', authData.user.id)
+      .single();
+
+    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 é "Row not found"
+        console.error("Erro ao buscar dados:", dbError);
+        throw new Error("Falha ao carregar seus dados.");
+    }
+
+    // Montar o objeto User local
+    const user: User = {
+        id: authData.user.id,
+        username: authData.user.user_metadata?.username || email.split('@')[0],
+        email: authData.user.email || '',
+        createdAt: new Date(authData.user.created_at).getTime()
+    };
+
+    // Se não tiver dados salvos, cria estado inicial
+    const appStateData = dbData?.data || createInitialState();
+
+    return { ...appStateData, user };
   },
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    const db = getLocalDB();
-    const exists = Object.values(db.users).some((u: any) => u.user.email.toLowerCase() === email.toLowerCase());
-    
-    if (exists) {
-        throw new Error("Este email já está cadastrado neste dispositivo.");
+    // 1. Criar usuário no Auth do Supabase
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username } // Salva o username nos metadados
+      }
+    });
+
+    if (authError) {
+       console.error("Erro Supabase:", authError);
+       
+       if (authError.message.includes("rate limit")) {
+         throw new Error("Limite de emails excedido (Supabase).\n\nSOLUÇÃO: Vá no painel Supabase > Authentication > Providers > Email e DESATIVE 'Confirm email'.");
+       }
+       if (authError.message.includes("User already registered")) {
+         throw new Error("Este email já está cadastrado. Tente fazer login.");
+       }
+       if (authError.message.includes("Password should be")) {
+         throw new Error("A senha deve ter pelo menos 6 caracteres.");
+       }
+       
+       throw new Error(authError.message);
     }
 
-    const newId = crypto.randomUUID();
-    const newUser: User = {
-        id: newId,
-        username,
-        email,
+    if (!authData.user) {
+        throw new Error("Erro ao iniciar registro.");
+    }
+
+    // 2. Preparar estado inicial
+    const initialState = createInitialState();
+    
+    const user: User = {
+        id: authData.user.id,
+        username: username,
+        email: email,
         createdAt: Date.now()
     };
 
-    const initialState = createInitialState();
+    // 3. Salvar estado inicial APENAS se houver sessão ativa
+    if (authData.session) {
+        const { error: dbError } = await supabase
+            .from('app_data')
+            .insert({
+                user_id: authData.user.id,
+                data: initialState
+            });
 
-    db.users[newId] = {
-        user: newUser,
-        password: password, // Armazenando simples para validação local
-        data: initialState
-    };
+        if (dbError) {
+            console.error("Erro ao criar dados iniciais:", dbError);
+        }
+    } else {
+        alert("Conta criada! O Supabase enviou um email de confirmação.\n\nPara pular isso, vá em Authentication > Providers > Email e desmarque 'Confirm Email'.");
+    }
 
-    saveLocalDB(db);
-
-    return { user: newUser, ...initialState };
+    return { user, ...initialState };
   }
 };
 
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
-    const { user, ...data } = state;
-    const db = getLocalDB();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        console.warn("Tentativa de salvar sem sessão ativa. Ignorando.");
+        return;
+    }
+
+    const { user, ...dataToSave } = state;
     
-    if (db.users[userId]) {
-        db.users[userId].data = data;
-        saveLocalDB(db);
-        console.log("Estado salvo localmente.");
+    const { error } = await supabase
+        .from('app_data')
+        .upsert({
+            user_id: userId,
+            data: dataToSave,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+    if (error) {
+        console.error("Erro ao sincronizar com Supabase:", error.message);
     }
   }
 };

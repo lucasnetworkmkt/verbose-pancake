@@ -1,7 +1,7 @@
 {
   "name": "codigo-da-execucao",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,8 @@
     "recharts": "^2.12.3",
     "date-fns": "^3.6.0",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    "@supabase/supabase-js": "^2.39.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

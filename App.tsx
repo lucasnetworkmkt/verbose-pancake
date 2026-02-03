@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { format, isToday, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, subDays } from 'date-fns';
+import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   LayoutDashboard, 
@@ -50,6 +50,25 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // --- VALIDAÇÕES LOCAIS ---
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        setError("Formato de email inválido.\nCertifique-se de usar algo como 'exemplo@gmail.com'.");
+        return;
+    }
+
+    if (password.length < 6) {
+        setError("A senha precisa ter pelo menos 6 caracteres.");
+        return;
+    }
+
+    if (isRegister && username.length < 3) {
+        setError("O nome de usuário deve ter pelo menos 3 caracteres.");
+        return;
+    }
+    // -------------------------
+
     setLoading(true);
     try {
       if (isRegister) {
@@ -194,7 +213,8 @@ function App() {
     const today = new Date();
     
     for (let i = 0; i < 365; i++) {
-      const date = subDays(today, i);
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
       const dateStr = format(date, 'yyyy-MM-dd');
       const log = appState.dayLogs[dateStr];
       
@@ -210,301 +230,384 @@ function App() {
   }, [appState]);
 
   const toggleRoutineForToday = (routineId: string) => {
-    if (!appState) return;
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const existingLog = appState.dayLogs[todayStr] || {
-      date: todayStr,
-      completedRoutineIds: [],
-      mode: DayMode.NORMAL,
-      isValid: false
-    };
+    setAppState(prev => {
+        if (!prev) return null;
+        
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const existingLog = prev.dayLogs[todayStr] || {
+            date: todayStr,
+            completedRoutineIds: [],
+            mode: DayMode.NORMAL,
+            isValid: false
+        };
 
-    const isCompleted = existingLog.completedRoutineIds.includes(routineId);
-    let newCompletedIds = [...existingLog.completedRoutineIds];
-    
-    if (isCompleted) {
-      newCompletedIds = newCompletedIds.filter(id => id !== routineId);
-    } else {
-      newCompletedIds.push(routineId);
-    }
-
-    const totalRoutines = appState.routines.length;
-    const completionRate = totalRoutines > 0 ? newCompletedIds.length / totalRoutines : 0;
-    const isValid = completionRate >= appState.settings.validDayThreshold;
-
-    if (!existingLog.isValid && isValid) {
-      showToast("Dia VALIDADO. Consistência mantida.");
-    }
-
-    setAppState({
-      ...appState,
-      dayLogs: {
-        ...appState.dayLogs,
-        [todayStr]: {
-          ...existingLog,
-          completedRoutineIds: newCompletedIds,
-          isValid
+        const isCompleted = existingLog.completedRoutineIds.includes(routineId);
+        let newCompletedIds = [...existingLog.completedRoutineIds];
+        
+        if (isCompleted) {
+            newCompletedIds = newCompletedIds.filter(id => id !== routineId);
+        } else {
+            newCompletedIds.push(routineId);
         }
-      }
+
+        const totalRoutines = prev.routines.length;
+        const completionRate = totalRoutines > 0 ? newCompletedIds.length / totalRoutines : 0;
+        const isValid = completionRate >= prev.settings.validDayThreshold;
+
+        if (!existingLog.isValid && isValid) {
+            showToast("Dia VALIDADO. Consistência mantida.");
+        }
+
+        return {
+            ...prev,
+            dayLogs: {
+                ...prev.dayLogs,
+                [todayStr]: {
+                    ...existingLog,
+                    completedRoutineIds: newCompletedIds,
+                    isValid
+                }
+            }
+        };
     });
   };
 
   const setDayMode = (mode: DayMode) => {
-    if (!appState) return;
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const existingLog = appState.dayLogs[todayStr] || {
-      date: todayStr,
-      completedRoutineIds: [],
-      mode: DayMode.NORMAL,
-      isValid: false
-    };
+    setAppState(prev => {
+        if(!prev) return null;
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const existingLog = prev.dayLogs[todayStr] || {
+          date: todayStr,
+          completedRoutineIds: [],
+          mode: DayMode.NORMAL,
+          isValid: false
+        };
 
-    setAppState({
-      ...appState,
-      dayLogs: {
-        ...appState.dayLogs,
-        [todayStr]: { ...existingLog, mode }
-      }
+        return {
+          ...prev,
+          dayLogs: {
+            ...prev.dayLogs,
+            [todayStr]: { ...existingLog, mode }
+          }
+        };
     });
   };
 
   const addRoutine = (title: string, priority: Priority, category: Category, goalId?: string) => {
-    if (!appState) return;
-    const newRoutine: Routine = {
-      id: crypto.randomUUID(),
-      title,
-      priority,
-      category,
-      frequency: 'DAILY',
-      linkedGoalId: goalId,
-      routineTasks: []
-    };
-    setAppState({ ...appState, routines: [...appState.routines, newRoutine] });
+    setAppState(prev => {
+        if(!prev) return null;
+        const newRoutine: Routine = {
+            id: crypto.randomUUID(),
+            title,
+            priority,
+            category,
+            frequency: 'DAILY',
+            linkedGoalId: goalId,
+            routineTasks: []
+        };
+        return { ...prev, routines: [...prev.routines, newRoutine] };
+    });
+  };
+
+  // --- DELETE ROUTINE ---
+  const deleteRoutine = (id: string) => {
+      if (window.confirm("Tem certeza que deseja excluir esta rotina?")) {
+          setAppState(prev => {
+              if(!prev) return null;
+              const updatedRoutines = prev.routines.filter(r => r.id !== id);
+              return {...prev, routines: updatedRoutines};
+          });
+          showToast("Rotina excluída.");
+      }
   };
   
   const handleUpdateRoutine = (updatedRoutine: Routine) => {
-      if(!appState) return;
-      const updatedRoutines = appState.routines.map(r => 
-          r.id === updatedRoutine.id ? updatedRoutine : r
-      );
-      setAppState({...appState, routines: updatedRoutines});
-      setSelectedRoutineForDetails(updatedRoutine); 
+      setAppState(prev => {
+          if(!prev) return null;
+          const updatedRoutines = prev.routines.map(r => 
+              r.id === updatedRoutine.id ? updatedRoutine : r
+          );
+          return {...prev, routines: updatedRoutines};
+      });
+      
+      // Update local state if needed
+      if (selectedRoutineForDetails?.id === updatedRoutine.id) {
+        setSelectedRoutineForDetails(updatedRoutine);
+      }
   };
 
   const handleCreateGoal = (data: { title: string; description: string; deadline: string; category: Category; priority: Priority }) => {
-      if(!appState) return;
-      const newGoal: Goal = {
-          id: crypto.randomUUID(),
-          title: data.title,
-          description: data.description,
-          deadline: data.deadline,
-          status: 'ACTIVE',
-          category: data.category,
-          priority: data.priority,
-          tasks: []
-      };
-      setAppState({...appState, goals: [...appState.goals, newGoal]});
+      setAppState(prev => {
+          if(!prev) return null;
+          const newGoal: Goal = {
+              id: crypto.randomUUID(),
+              title: data.title,
+              description: data.description,
+              deadline: data.deadline,
+              status: 'ACTIVE',
+              category: data.category,
+              priority: data.priority,
+              tasks: []
+          };
+          return {...prev, goals: [...prev.goals, newGoal]};
+      });
+  };
+
+  // --- DELETE GOAL ---
+  const deleteGoal = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (window.confirm("Tem certeza que deseja excluir esta meta?")) {
+        setAppState(prev => {
+            if(!prev) return null;
+            const updatedGoals = prev.goals.filter(g => g.id !== id);
+            return {...prev, goals: updatedGoals};
+        });
+        showToast("Meta excluída.");
+    }
   };
 
   const addTaskToGoal = (goalId: string, taskTitle: string, time: string = "00:00") => {
-      if(!appState) return;
-      const newTask: MicroTask = {
-          id: crypto.randomUUID(),
-          title: taskTitle,
-          isCompleted: false,
-          time
-      };
-      const updatedGoals = appState.goals.map(g => {
-          if(g.id === goalId) {
-              return { ...g, tasks: [...g.tasks, newTask] };
-          }
-          return g;
+      setAppState(prev => {
+          if(!prev) return null;
+          const newTask: MicroTask = {
+              id: crypto.randomUUID(),
+              title: taskTitle,
+              isCompleted: false,
+              time
+          };
+          const updatedGoals = prev.goals.map(g => {
+              if(g.id === goalId) {
+                  return { ...g, tasks: [...g.tasks, newTask] };
+              }
+              return g;
+          });
+          return {...prev, goals: updatedGoals};
       });
-      setAppState({...appState, goals: updatedGoals});
   };
 
   const toggleGoalTask = (goalId: string, taskId: string) => {
-      if(!appState) return;
-      const updatedGoals = appState.goals.map(g => {
-          if(g.id === goalId) {
-              const updatedTasks = g.tasks.map(t => {
-                  if(t.id === taskId) return { ...t, isCompleted: !t.isCompleted };
-                  return t;
-              });
-              return { ...g, tasks: updatedTasks };
-          }
-          return g;
+      setAppState(prev => {
+          if(!prev) return null;
+          const updatedGoals = prev.goals.map(g => {
+              if(g.id === goalId) {
+                  const updatedTasks = g.tasks.map(t => {
+                      if(t.id === taskId) return { ...t, isCompleted: !t.isCompleted };
+                      return t;
+                  });
+                  return { ...g, tasks: updatedTasks };
+              }
+              return g;
+          });
+          return {...prev, goals: updatedGoals};
       });
-      setAppState({...appState, goals: updatedGoals});
+  };
+
+  // --- DELETE GOAL TASK ---
+  const deleteGoalTask = (goalId: string, taskId: string) => {
+      if (window.confirm("Excluir esta micro tarefa?")) {
+          setAppState(prev => {
+              if(!prev) return null;
+              const updatedGoals = prev.goals.map(g => {
+                  if(g.id === goalId) {
+                      return { ...g, tasks: g.tasks.filter(t => t.id !== taskId) };
+                  }
+                  return g;
+              });
+              return {...prev, goals: updatedGoals};
+          });
+          // showToast("Micro tarefa excluída.");
+      }
   };
 
   const updateTaskTime = (goalId: string, taskId: string, newTime: string) => {
-      if(!appState) return;
-      const updatedGoals = appState.goals.map(g => {
-          if(g.id === goalId) {
-              const updatedTasks = g.tasks.map(t => {
-                  if(t.id === taskId) return { ...t, time: newTime };
-                  return t;
-              });
-              return { ...g, tasks: updatedTasks };
-          }
-          return g;
+      setAppState(prev => {
+          if(!prev) return null;
+          const updatedGoals = prev.goals.map(g => {
+              if(g.id === goalId) {
+                  const updatedTasks = g.tasks.map(t => {
+                      if(t.id === taskId) return { ...t, time: newTime };
+                      return t;
+                  });
+                  return { ...g, tasks: updatedTasks };
+              }
+              return g;
+          });
+          return {...prev, goals: updatedGoals};
       });
-      setAppState({...appState, goals: updatedGoals});
   };
 
   // Timer Update Handler
   const handleUpdateTimer = (newTimerState: TimerState) => {
-      if(!appState) return;
-      setAppState({ ...appState, timer: newTimerState });
+      setAppState(prev => prev ? ({ ...prev, timer: newTimerState }) : null);
   };
 
-  // Evolution Handlers LEVEL 1
+  // Evolution Handlers
   const handleStartLevel1 = () => {
-      if(!appState) return;
-      setAppState({
-          ...appState,
-          evolution: { ...appState.evolution!, startDate: new Date().toISOString() }
-      });
+      setAppState(prev => prev ? ({
+          ...prev,
+          evolution: { ...prev.evolution!, startDate: new Date().toISOString() }
+      }) : null);
       showToast("Nível 1 Iniciado. Relógio rodando.");
   };
 
   const handleCompleteEvolutionDay = (day: number) => {
-      if(!appState) return;
-      const currentCompleted = appState.evolution?.completedDays || [];
-      if (!currentCompleted.includes(day)) {
-          setAppState({
-              ...appState,
-              evolution: { ...appState.evolution, completedDays: [...currentCompleted, day] }
-          });
-          showToast(`Nível 1: Desafio do Dia ${day} Concluído!`);
-      }
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentCompleted = prev.evolution?.completedDays || [];
+          if (!currentCompleted.includes(day)) {
+              showToast(`Nível 1: Desafio do Dia ${day} Concluído!`);
+              return {
+                  ...prev,
+                  evolution: { ...prev.evolution, completedDays: [...currentCompleted, day] }
+              };
+          }
+          return prev;
+      });
   };
 
   const handleUndoEvolutionDay = (day: number) => {
-      if(!appState) return;
-      const currentCompleted = appState.evolution?.completedDays || [];
-      setAppState({
-          ...appState,
-          evolution: { ...appState.evolution, completedDays: currentCompleted.filter(d => d !== day) }
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentCompleted = prev.evolution?.completedDays || [];
+          return {
+              ...prev,
+              evolution: { ...prev.evolution, completedDays: currentCompleted.filter(d => d !== day) }
+          };
       });
   };
 
   // Evolution Handlers LEVEL 2
   const handleStartLevel2 = () => {
-      if(!appState) return;
-      setAppState({
-          ...appState,
-          evolution: { ...appState.evolution!, startDateLevel2: new Date().toISOString() }
-      });
+      setAppState(prev => prev ? ({
+          ...prev,
+          evolution: { ...prev.evolution!, startDateLevel2: new Date().toISOString() }
+      }) : null);
       showToast("Nível 2 Iniciado. Sem volta.");
   };
 
   const handleCompleteEvolutionDayLevel2 = (day: number) => {
-      if(!appState) return;
-      const currentCompleted = appState.evolution?.completedDaysLevel2 || [];
-      if (!currentCompleted.includes(day)) {
-          setAppState({
-              ...appState,
-              evolution: { ...appState.evolution!, completedDaysLevel2: [...currentCompleted, day] }
-          });
-          showToast(`Nível 2: Desafio do Dia ${day} Concluído!`);
-      }
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentCompleted = prev.evolution?.completedDaysLevel2 || [];
+          if (!currentCompleted.includes(day)) {
+              showToast(`Nível 2: Desafio do Dia ${day} Concluído!`);
+              return {
+                  ...prev,
+                  evolution: { ...prev.evolution!, completedDaysLevel2: [...currentCompleted, day] }
+              };
+          }
+          return prev;
+      });
   };
 
   const handleUndoEvolutionDayLevel2 = (day: number) => {
-      if(!appState) return;
-      const currentCompleted = appState.evolution?.completedDaysLevel2 || [];
-      setAppState({
-          ...appState,
-          evolution: { ...appState.evolution!, completedDaysLevel2: currentCompleted.filter(d => d !== day) }
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentCompleted = prev.evolution?.completedDaysLevel2 || [];
+          return {
+              ...prev,
+              evolution: { ...prev.evolution!, completedDaysLevel2: currentCompleted.filter(d => d !== day) }
+          };
       });
   };
 
   // Evolution Handlers LEVEL 3
   const handleStartLevel3 = () => {
-    if(!appState || !appState.evolution) return;
-    const newL3State = {
-        isStarted: true,
-        startDate: new Date().toISOString(),
-        completedDays: [],
-        lastCompletionDate: null
-    };
-    setAppState({
-        ...appState,
-        evolution: { ...appState.evolution, level3: newL3State }
+    setAppState(prev => {
+        if(!prev || !prev.evolution) return null;
+        const newL3State = {
+            isStarted: true,
+            startDate: new Date().toISOString(),
+            completedDays: [],
+            lastCompletionDate: null
+        };
+        return {
+            ...prev,
+            evolution: { ...prev.evolution, level3: newL3State }
+        };
     });
     showToast("Nível 3 Iniciado. Boa sorte.");
   };
 
   const handleCompleteEvolutionDayLevel3 = (day: number) => {
-      if(!appState || !appState.evolution || !appState.evolution.level3) return;
-      const l3 = appState.evolution.level3;
-      
-      if (!l3.completedDays.includes(day)) {
-          // Check Reset Condition (Simulated logic: if it was passed 48h since last completion, reset. 
-          // Here we just save the state, reset logic would be on load or backend)
+      setAppState(prev => {
+          if(!prev || !prev.evolution || !prev.evolution.level3) return null;
+          const l3 = prev.evolution.level3;
           
-          setAppState({
-              ...appState,
-              evolution: { 
-                  ...appState.evolution, 
-                  level3: { 
-                      ...l3, 
-                      completedDays: [...l3.completedDays, day],
-                      lastCompletionDate: new Date().toISOString()
-                  } 
-              }
-          });
-          
-          if(day === 40) {
-              showToast("Execução comprovada. Você passou.");
-          } else {
-              showToast(`Nível 3: Dia ${day} Vencido.`);
+          if (!l3.completedDays.includes(day)) {
+              if(day === 40) showToast("Execução comprovada. Você passou.");
+              else showToast(`Nível 3: Dia ${day} Vencido.`);
+
+              return {
+                  ...prev,
+                  evolution: { 
+                      ...prev.evolution, 
+                      level3: { 
+                          ...l3, 
+                          completedDays: [...l3.completedDays, day],
+                          lastCompletionDate: new Date().toISOString()
+                      } 
+                  }
+              };
           }
-      }
+          return prev;
+      });
   };
 
   // Note Handlers
   const handleAddNote = (note: Note) => {
-      if(!appState) return;
-      const currentNotes = appState.notes || [];
-      setAppState({ ...appState, notes: [note, ...currentNotes] });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentNotes = prev.notes || [];
+          return { ...prev, notes: [note, ...currentNotes] };
+      });
   };
 
   const handleUpdateNote = (updatedNote: Note) => {
-      if(!appState) return;
-      const currentNotes = appState.notes || [];
-      const updatedNotes = currentNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
-      setAppState({ ...appState, notes: updatedNotes });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentNotes = prev.notes || [];
+          const updatedNotes = currentNotes.map(n => n.id === updatedNote.id ? updatedNote : n);
+          return { ...prev, notes: updatedNotes };
+      });
   };
 
   const handleDeleteNote = (id: string) => {
-      if(!appState) return;
-      const currentNotes = appState.notes || [];
-      const updatedNotes = currentNotes.filter(n => n.id !== id);
-      setAppState({ ...appState, notes: updatedNotes });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentNotes = prev.notes || [];
+          const updatedNotes = currentNotes.filter(n => n.id !== id);
+          return { ...prev, notes: updatedNotes };
+      });
+      showToast("Anotação excluída.");
   };
 
   // Document Handlers
   const handleAddDocument = (doc: DocumentItem) => {
-      if(!appState) return;
-      const currentDocs = appState.documents || [];
-      setAppState({ ...appState, documents: [doc, ...currentDocs] });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentDocs = prev.documents || [];
+          return { ...prev, documents: [doc, ...currentDocs] };
+      });
   };
 
   const handleUpdateDocument = (updatedDoc: DocumentItem) => {
-      if(!appState) return;
-      const currentDocs = appState.documents || [];
-      const updatedDocs = currentDocs.map(d => d.id === updatedDoc.id ? updatedDoc : d);
-      setAppState({ ...appState, documents: updatedDocs });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentDocs = prev.documents || [];
+          const updatedDocs = currentDocs.map(d => d.id === updatedDoc.id ? updatedDoc : d);
+          return { ...prev, documents: updatedDocs };
+      });
   };
 
   const handleDeleteDocument = (id: string) => {
-      if(!appState) return;
-      const currentDocs = appState.documents || [];
-      const updatedDocs = currentDocs.filter(d => d.id !== id);
-      setAppState({ ...appState, documents: updatedDocs });
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentDocs = prev.documents || [];
+          const updatedDocs = currentDocs.filter(d => d.id !== id);
+          return { ...prev, documents: updatedDocs };
+      });
+      showToast("Documento excluído.");
   };
 
   // --- Render ---
@@ -582,6 +685,11 @@ function App() {
     { id: 'HISTORY', icon: CalendarIcon, label: 'Hist' }, 
     { id: 'TIMER', icon: Timer, label: 'Timer' }, 
   ];
+
+  // Native startOfMonth replacement
+  const startOfCurrentMonth = new Date();
+  startOfCurrentMonth.setDate(1);
+  startOfCurrentMonth.setHours(0,0,0,0);
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden">
@@ -735,6 +843,7 @@ function App() {
                      onToggle={toggleRoutineForToday}
                      onOpenDetails={setSelectedRoutineForDetails}
                      dateStr={todayStr}
+                     onDelete={deleteRoutine}
                    />
                 </div>
               </div>
@@ -780,7 +889,7 @@ function App() {
                     </div>
                     <div className="grid grid-cols-7 gap-1">
                         {eachDayOfInterval({
-                            start: startOfMonth(new Date()),
+                            start: startOfCurrentMonth,
                             end: endOfMonth(new Date())
                         }).map(day => {
                             const dStr = format(day, 'yyyy-MM-dd');
@@ -888,6 +997,7 @@ function App() {
                          }}
                          onOpenDetails={setSelectedRoutineForDetails}
                          dateStr={todayStr}
+                         onDelete={deleteRoutine}
                      />
                  </div>
              </div>
@@ -913,13 +1023,23 @@ function App() {
                             : 0;
 
                         return (
-                            <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-gray-800 p-4 md:p-6 rounded shadow-lg`}>
+                            <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-gray-800 p-4 md:p-6 rounded shadow-lg relative group`}>
                                 {/* Header */}
                                 <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
                                     <div className="space-y-1 w-full">
                                         <div className="flex items-center justify-between md:justify-start gap-3">
                                             <h3 className="text-xl md:text-2xl font-bold text-white truncate">{goal.title}</h3>
-                                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
+                                                {/* DELETE GOAL BUTTON */}
+                                                <button 
+                                                    onClick={(e) => deleteGoal(e, goal.id)}
+                                                    className="p-1 text-gray-600 hover:text-app-red transition-colors"
+                                                    title="Excluir Meta"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <p className="text-app-subtext text-sm max-w-xl">{goal.description}</p>
                                     </div>
@@ -964,12 +1084,21 @@ function App() {
                                                     type="time" 
                                                     value={task.time} 
                                                     onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)}
-                                                    className="bg-transparent text-xs text-gray-500 border-b border-gray-800 focus:border-app-gold outline-none w-14 text-center shrink-0"
+                                                    className="bg-transparent text-xs text-gray-500 border-b border-gray-800 focus:border-app-gold outline-none w-20 text-center shrink-0 cursor-pointer"
                                                 />
 
                                                 <span className={`flex-1 text-sm truncate ${task.isCompleted ? 'text-gray-600 line-through' : 'text-gray-300'}`}>
                                                     {task.title}
                                                 </span>
+                                                
+                                                {/* ADDED DELETE BUTTON */}
+                                                <button 
+                                                    onClick={() => deleteGoalTask(goal.id, task.id)}
+                                                    className="text-gray-500 hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Excluir tarefa"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>

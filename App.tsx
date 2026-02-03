@@ -997,7 +997,7 @@ function App() {
                          }}
                          onOpenDetails={setSelectedRoutineForDetails}
                          dateStr={todayStr}
-                         onDelete={deleteRoutine}
+                         onDelete={deleteRoutine} 
                      />
                  </div>
              </div>

@@ -1,19 +1,16 @@
-// Fixed: Remove reference to vite/client which was causing type definition errors
-// and manually define necessary interfaces and modules.
+/**
+ * Fix: Removed reference to "vite/client" to resolve type definition errors.
+ * Manually declared necessary types for Vite environment.
+ */
 
 interface ImportMetaEnv {
-  readonly BASE_URL: string;
-  readonly MODE: string;
-  readonly DEV: boolean;
-  readonly PROD: boolean;
-  readonly SSR: boolean;
-  // Adicione variáveis de ambiente personalizadas aqui se necessário
-  [key: string]: any;
+  readonly VITE_SUPABASE_URL: string
+  readonly VITE_SUPABASE_ANON_KEY: string
+  [key: string]: string | boolean | undefined
 }
 
 interface ImportMeta {
-  url: string;
-  readonly env: ImportMetaEnv;
+  readonly env: ImportMetaEnv
 }
 
 declare module '*.svg' {
@@ -23,17 +20,32 @@ declare module '*.svg' {
   export default src;
 }
 
-declare module '*.jpg' {
-  const content: string;
-  export default content;
-}
-
 declare module '*.png' {
-  const content: string;
-  export default content;
+  const value: string;
+  export default value;
 }
 
-declare module '*.json' {
-  const content: string;
-  export default content;
+declare module '*.jpg' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.jpeg' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.gif' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.webp' {
+  const value: string;
+  export default value;
+}
+
+declare module '*.ico' {
+  const value: string;
+  export default value;
 }

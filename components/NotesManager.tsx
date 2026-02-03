@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Trash2, FileText, Calendar, Tag, ChevronRight, Save, Link } from 'lucide-react';
 import { Note, Category, Goal, DocumentItem } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DocumentLibrary from './DocumentLibrary';
 
@@ -103,10 +103,9 @@ const NotesManager: React.FC<NotesManagerProps> = ({
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Tem certeza que deseja apagar este registro?")) {
-      onDeleteNote(id);
-      if (selectedNoteId === id) setSelectedNoteId(null);
-    }
+    // Exclusão imediata sem confirm
+    onDeleteNote(id);
+    if (selectedNoteId === id) setSelectedNoteId(null);
   };
 
   // --- Render ---
@@ -195,7 +194,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     >
                     <div className="flex justify-between items-start mb-2">
                         <h3 className={`font-bold text-sm ${selectedNoteId === note.id ? 'text-white' : 'text-gray-300'}`}>{note.title}</h3>
-                        <span className="text-[10px] text-gray-500">{format(parseISO(note.updatedAt), "d MMM", { locale: ptBR })}</span>
+                        <span className="text-[10px] text-gray-500">{format(new Date(note.updatedAt), "d MMM", { locale: ptBR })}</span>
                     </div>
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase tracking-wider bg-black px-2 py-0.5 rounded text-gray-400 border border-gray-800">
@@ -203,9 +202,10 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         </span>
                         <button 
                         onClick={(e) => handleDelete(e, note.id)}
-                        className="text-gray-600 hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-gray-500 hover:text-app-red transition-colors"
+                        title="Excluir"
                         >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                         </button>
                     </div>
                     </div>

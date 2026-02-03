@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Trash2, FileText, ExternalLink, Plus, Search, File } from 'lucide-react';
 import { DocumentItem } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface DocumentLibraryProps {
@@ -61,10 +61,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Deseja remover este documento da sua biblioteca?")) {
-      onDeleteDocument(id);
-      if (selectedDocId === id) setSelectedDocId(null);
-    }
+    // Exclusão imediata
+    onDeleteDocument(id);
+    if (selectedDocId === id) setSelectedDocId(null);
   };
 
   return (
@@ -140,7 +139,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                  <File className={`${selectedDocId === doc.id ? 'text-app-gold' : 'text-gray-500'}`} size={20} />
                  <div className="flex-1 min-w-0">
                     <h3 className={`font-bold text-sm truncate ${selectedDocId === doc.id ? 'text-white' : 'text-gray-300'}`}>{doc.title}</h3>
-                    <span className="text-[10px] text-gray-500">{format(parseISO(doc.createdAt), "d MMM, HH:mm", { locale: ptBR })}</span>
+                    <span className="text-[10px] text-gray-500">{format(new Date(doc.createdAt), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
                     onClick={(e) => handleDelete(e, doc.id)}
@@ -193,7 +192,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                        <FileText size={14} /> Anotações do Documento
                     </span>
                     <span className="text-[10px] text-gray-600 hidden md:inline">
-                        Adicionado em {format(parseISO(selectedDoc.createdAt), "d 'de' MMMM", { locale: ptBR })}
+                        Adicionado em {format(new Date(selectedDoc.createdAt), "d 'de' MMMM", { locale: ptBR })}
                     </span>
                  </div>
                  <textarea 

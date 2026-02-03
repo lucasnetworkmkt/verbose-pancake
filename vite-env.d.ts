@@ -16,36 +16,36 @@ interface ImportMeta {
 declare module '*.svg' {
   import * as React from 'react';
   export const ReactComponent: React.FunctionComponent<React.SVGProps<SVGSVGElement> & { title?: string }>;
-  const src: string;
-  export default src;
+  const svgSrc: string;
+  export default svgSrc;
 }
 
 declare module '*.png' {
-  const value: string;
-  export default value;
+  const pngSrc: string;
+  export default pngSrc;
 }
 
 declare module '*.jpg' {
-  const value: string;
-  export default value;
+  const jpgSrc: string;
+  export default jpgSrc;
 }
 
 declare module '*.jpeg' {
-  const value: string;
-  export default value;
+  const jpegSrc: string;
+  export default jpegSrc;
 }
 
 declare module '*.gif' {
-  const value: string;
-  export default value;
+  const gifSrc: string;
+  export default gifSrc;
 }
 
 declare module '*.webp' {
-  const value: string;
-  export default value;
+  const webpSrc: string;
+  export default webpSrc;
 }
 
 declare module '*.ico' {
-  const value: string;
-  export default value;
+  const icoSrc: string;
+  export default icoSrc;
 }

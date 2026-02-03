@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Trash2, FileText, Download, AlertCircle, File, Search } from 'lucide-react';
 import { PdfDocument } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface PdfLibraryProps {
@@ -69,10 +69,9 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (confirm("Deseja realmente excluir este PDF e suas anotações?")) {
-      onDeletePdf(id);
-      if (selectedPdfId === id) setSelectedPdfId(null);
-    }
+    // Exclusão imediata
+    onDeletePdf(id);
+    if (selectedPdfId === id) setSelectedPdfId(null);
   };
 
   return (
@@ -128,7 +127,7 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
                  <File className={`${selectedPdfId === pdf.id ? 'text-app-gold' : 'text-gray-500'}`} size={20} />
                  <div className="flex-1 min-w-0">
                     <h3 className={`font-bold text-sm truncate ${selectedPdfId === pdf.id ? 'text-white' : 'text-gray-300'}`}>{pdf.fileName}</h3>
-                    <span className="text-[10px] text-gray-500">{format(parseISO(pdf.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
+                    <span className="text-[10px] text-gray-500">{format(new Date(pdf.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
                     onClick={(e) => handleDelete(e, pdf.id)}

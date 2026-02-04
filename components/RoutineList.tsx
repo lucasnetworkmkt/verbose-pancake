@@ -1,17 +1,18 @@
 import React from 'react';
 import { Routine, Priority, DayLog } from '../types';
 import { getPriorityBorderClass, getPriorityColor } from '../constants';
-import { Check, Clock, Settings, List } from 'lucide-react';
+import { Check, Clock, Settings, List, Trash2 } from 'lucide-react';
 
 interface RoutineListProps {
   routines: Routine[];
   currentLog: DayLog | undefined;
   onToggle: (routineId: string) => void;
-  onOpenDetails?: (routine: Routine) => void; // New prop for opening details
+  onOpenDetails?: (routine: Routine) => void; 
   dateStr: string;
+  onDelete?: (routineId: string) => void;
 }
 
-const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggle, onOpenDetails, dateStr }) => {
+const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggle, onOpenDetails, dateStr, onDelete }) => {
   const completedIds = currentLog?.completedRoutineIds || [];
   
   // Sort: High Priority First, then completed last
@@ -44,14 +45,14 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggl
           <div 
             key={routine.id}
             className={`
-              group relative p-4 bg-app-card border-l-4 ${borderColor} 
+              relative p-4 bg-app-card border-l-4 ${borderColor} 
               transition-all duration-200 flex items-center justify-between
               ${isCompleted ? 'opacity-50' : 'hover:bg-[#1C2834]'}
             `}
           >
             {/* Clickable Area for Toggling Main Routine */}
             <div 
-                className="flex items-center gap-3 flex-1 cursor-pointer"
+                className="flex items-center gap-3 flex-1 cursor-pointer select-none"
                 onClick={() => onToggle(routine.id)}
             >
                 <div 
@@ -70,21 +71,21 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggl
                   )}
                 </div>
                 
-                <div>
-                  <h4 className={`font-medium ${isCompleted ? 'text-app-subtext line-through' : 'text-white'}`}>
+                <div className="min-w-0 pr-2">
+                  <h4 className={`font-medium truncate ${isCompleted ? 'text-app-subtext line-through' : 'text-white'}`}>
                     {routine.title}
                   </h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-black text-gray-400 border border-gray-800">
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-black text-gray-400 border border-gray-800 whitespace-nowrap">
                         {routine.category}
                     </span>
                     {routine.time && (
-                      <span className="text-xs text-app-subtext flex items-center gap-1">
+                      <span className="text-xs text-app-subtext flex items-center gap-1 whitespace-nowrap">
                         <Clock size={10} /> {routine.time}
                       </span>
                     )}
                     {taskCount > 0 && (
-                       <span className="text-[10px] text-app-gold flex items-center gap-1 ml-2">
+                       <span className="text-[10px] text-app-gold flex items-center gap-1 ml-1 whitespace-nowrap">
                            <List size={10} /> {taskCount} passos
                        </span>
                     )}
@@ -92,18 +93,40 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggl
                 </div>
             </div>
 
-            {/* Config Button - Only visible if prop provided */}
-            {onOpenDetails && (
-                <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenDetails(routine);
-                    }}
-                    className="p-2 text-gray-600 hover:text-white transition-colors"
-                >
-                    <Settings size={18} />
-                </button>
-            )}
+            {/* Actions Container - Isolated z-index */}
+            <div className="flex items-center gap-1 z-10 shrink-0">
+                {/* Delete Button */}
+                {onDelete && (
+                    <button 
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(routine.id);
+                        }}
+                        className="p-2 text-gray-600 hover:text-app-red hover:bg-app-red/10 rounded transition-colors"
+                        title="Excluir Rotina"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                )}
+
+                {/* Config Button */}
+                {onOpenDetails && (
+                    <button 
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenDetails(routine);
+                        }}
+                        className="p-2 text-gray-600 hover:text-white hover:bg-white/10 rounded transition-colors"
+                        title="Detalhes"
+                    >
+                        <Settings size={18} />
+                    </button>
+                )}
+            </div>
           </div>
         );
       })}

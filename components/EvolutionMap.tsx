@@ -135,13 +135,13 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
              {level === 3 ? <Flame size={64} /> : (level === 2 ? <Sword size={64} /> : <Shield size={64} />)}
           </div>
           
-          <h2 className="text-3xl font-bold text-white mb-2 uppercase">Iniciar Nível {level}</h2>
+          <h2 className="text-3xl font-bold text-app-text mb-2 uppercase">Iniciar Nível {level}</h2>
           <p className="text-app-subtext mb-8 max-w-md">Este desafio funciona em tempo real. Ao iniciar, os dias serão liberados automaticamente a cada 24h. Você não poderá pular dias ou avançar manualmente.</p>
           
           <div className="flex gap-4">
               <button 
                 onClick={() => setViewMode('SELECTION')} 
-                className="text-gray-500 hover:text-white px-6 py-3 uppercase font-bold text-xs tracking-widest transition-colors"
+                className="text-app-subtext hover:text-app-text px-6 py-3 uppercase font-bold text-xs tracking-widest transition-colors"
               >
                 Voltar
               </button>
@@ -160,8 +160,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   // --- LEVEL SELECTION SCREEN ---
   if (viewMode === 'SELECTION') {
       return (
-        <div className="flex flex-col h-full bg-[#0A0A0A] p-4 md:p-8 overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+        <div className="flex flex-col h-full bg-app-bg p-4 md:p-8 overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2 text-app-text">
                 <MapPin className="text-app-gold" /> MAPA DA EVOLUÇÃO
             </h2>
 
@@ -178,41 +178,41 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                         <span className="bg-app-gold text-black text-xs font-bold px-2 py-1 rounded uppercase">Iniciante</span>
                         {isLevel1Complete && <CheckCircleIcon />}
                     </div>
-                    <h3 className="text-3xl font-bold text-white mb-2 relative z-10">NÍVEL 1</h3>
-                    <div className="w-full bg-black h-2 rounded-full relative z-10">
+                    <h3 className="text-3xl font-bold text-app-text mb-2 relative z-10">NÍVEL 1</h3>
+                    <div className="w-full bg-app-input h-2 rounded-full relative z-10">
                         <div className="bg-app-gold h-2 rounded-full" style={{ width: `${Math.min((evolutionState.completedDays.length / 40) * 100, 100)}%` }}></div>
                     </div>
-                    <span className="text-xs text-gray-500 mt-2 block relative z-10">{evolutionState.completedDays.length}/40 Dias</span>
+                    <span className="text-xs text-app-subtext mt-2 block relative z-10">{evolutionState.completedDays.length}/40 Dias</span>
                 </div>
 
                 {/* Level 2 Card */}
-                <div onClick={handleLevel2Click} className={`rounded-xl p-8 transition-all relative overflow-hidden border ${isLevel1Complete ? 'bg-app-card border-app-red/30 hover:border-app-red cursor-pointer hover:scale-[1.02]' : 'bg-[#121212] border-gray-800 cursor-not-allowed opacity-70'}`}>
+                <div onClick={handleLevel2Click} className={`rounded-xl p-8 transition-all relative overflow-hidden border ${isLevel1Complete ? 'bg-app-card border-app-red/30 hover:border-app-red cursor-pointer hover:scale-[1.02]' : 'bg-app-input border-app-border cursor-not-allowed opacity-70'}`}>
                     <div className="flex justify-between items-start mb-4 relative z-10">
-                        <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${isLevel1Complete ? 'bg-app-red text-white' : 'bg-gray-800 text-gray-500'}`}>Avançado</span>
-                        {!isLevel1Complete && <Lock className="text-gray-600" size={24} />}
+                        <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${isLevel1Complete ? 'bg-app-red text-white' : 'bg-app-input border border-app-border text-app-subtext'}`}>Avançado</span>
+                        {!isLevel1Complete && <Lock className="text-app-subtext" size={24} />}
                     </div>
-                    <h3 className="text-3xl font-bold text-white mb-2 relative z-10">NÍVEL 2</h3>
+                    <h3 className="text-3xl font-bold text-app-text mb-2 relative z-10">NÍVEL 2</h3>
                     {isLevel1Complete ? (
                         <>
-                            <div className="w-full bg-black h-2 rounded-full relative z-10"><div className="bg-app-red h-2 rounded-full" style={{ width: `${Math.min(((evolutionState.completedDaysLevel2?.length || 0) / 40) * 100, 100)}%` }}></div></div>
-                            <span className="text-xs text-gray-500 mt-2 block relative z-10">{evolutionState.completedDaysLevel2?.length || 0}/40 Dias</span>
+                            <div className="w-full bg-app-input h-2 rounded-full relative z-10"><div className="bg-app-red h-2 rounded-full" style={{ width: `${Math.min(((evolutionState.completedDaysLevel2?.length || 0) / 40) * 100, 100)}%` }}></div></div>
+                            <span className="text-xs text-app-subtext mt-2 block relative z-10">{evolutionState.completedDaysLevel2?.length || 0}/40 Dias</span>
                         </>
                     ) : <LockedMessage />}
                 </div>
 
                 {/* Level 3 Card */}
-                <div onClick={handleLevel3Click} className={`rounded-xl p-8 transition-all relative overflow-hidden border ${isLevel1Complete && isLevel2Complete ? 'bg-app-card border-purple-500/30 hover:border-purple-500 cursor-pointer hover:scale-[1.02]' : 'bg-[#121212] border-gray-800 cursor-not-allowed opacity-70'}`}>
+                <div onClick={handleLevel3Click} className={`rounded-xl p-8 transition-all relative overflow-hidden border ${isLevel1Complete && isLevel2Complete ? 'bg-app-card border-purple-500/30 hover:border-purple-500 cursor-pointer hover:scale-[1.02]' : 'bg-app-input border-app-border cursor-not-allowed opacity-70'}`}>
                     <div className="flex justify-between items-start mb-4 relative z-10">
-                        <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${isLevel1Complete && isLevel2Complete ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-500'}`}>Execução Real</span>
-                        {!(isLevel1Complete && isLevel2Complete) && <Lock className="text-gray-600" size={24} />}
+                        <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${isLevel1Complete && isLevel2Complete ? 'bg-purple-600 text-white' : 'bg-app-input border border-app-border text-app-subtext'}`}>Execução Real</span>
+                        {!(isLevel1Complete && isLevel2Complete) && <Lock className="text-app-subtext" size={24} />}
                     </div>
-                    <h3 className="text-3xl font-bold text-white mb-2 relative z-10">NÍVEL 3</h3>
+                    <h3 className="text-3xl font-bold text-app-text mb-2 relative z-10">NÍVEL 3</h3>
                     {isLevel1Complete && isLevel2Complete ? (
                         <>
-                            <div className="w-full bg-black h-2 rounded-full relative z-10"><div className="bg-purple-600 h-2 rounded-full" style={{ width: `${Math.min((level3State.completedDays.length / 40) * 100, 100)}%` }}></div></div>
-                            <span className="text-xs text-gray-500 mt-2 block relative z-10">{level3State.completedDays.length}/40 Dias</span>
+                            <div className="w-full bg-app-input h-2 rounded-full relative z-10"><div className="bg-purple-600 h-2 rounded-full" style={{ width: `${Math.min((level3State.completedDays.length / 40) * 100, 100)}%` }}></div></div>
+                            <span className="text-xs text-app-subtext mt-2 block relative z-10">{level3State.completedDays.length}/40 Dias</span>
                         </>
-                    ) : <div className="bg-gray-900/50 p-3 rounded border border-gray-800 text-xs text-gray-400 text-center relative z-10"><Lock size={12} className="inline mr-1" /> Complete Níveis 1 e 2</div>}
+                    ) : <div className="bg-app-input/50 p-3 rounded border border-app-border text-xs text-app-subtext text-center relative z-10"><Lock size={12} className="inline mr-1" /> Complete Níveis 1 e 2</div>}
                 </div>
             </div>
         </div>
@@ -302,15 +302,15 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const waitText = unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
 
   return (
-    <div className="relative w-full h-full flex flex-col bg-[#0A0A0A]">
-      <div className="p-6 sticky top-0 bg-[#0A0A0A]/90 backdrop-blur z-20 border-b border-gray-800 flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+    <div className="relative w-full h-full flex flex-col bg-app-bg">
+      <div className="p-6 sticky top-0 bg-app-bg/90 backdrop-blur z-20 border-b border-app-border flex items-center justify-between">
+        <h2 className="text-xl font-bold flex items-center gap-2 text-app-text">
             <MapPin className={isL3 ? "text-purple-500" : (isL2 ? "text-app-red" : "text-app-gold")} /> 
             {isL3 ? "NÍVEL 3 - EXECUÇÃO REAL" : (isL2 ? "NÍVEL 2 - AVANÇADO" : "NÍVEL 1 - INICIANTE")}
         </h2>
         <button 
             onClick={() => setViewMode('SELECTION')}
-            className="text-sm font-bold uppercase text-app-subtext hover:text-white flex items-center gap-1"
+            className="text-sm font-bold uppercase text-app-subtext hover:text-app-text flex items-center gap-1"
         >
             <ChevronLeft size={16} /> Voltar
         </button>
@@ -365,8 +365,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                                 : isActive 
                                     ? `bg-white ${accentColor} text-black animate-pulse shadow-[0_0_20px_rgba(255,255,255,0.2)]` 
                                     : isWaiting
-                                        ? 'bg-app-card border-gray-600 text-gray-400'
-                                        : 'bg-[#1a1a1a] border-gray-800 text-gray-700 grayscale'
+                                        ? 'bg-app-card border-app-border text-app-subtext'
+                                        : 'bg-app-input border-app-border text-app-subtext grayscale'
                             }
                         `}
                         style={{ left: `${pos.x}%`, top: `${pos.y}px`, borderColor: isActive ? accentHex : undefined }}
@@ -379,7 +379,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                             </div>
                         )}
                         {isWaiting && (
-                            <div className="absolute top-full mt-2 bg-gray-900 border border-gray-700 text-gray-400 text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap z-20">
+                            <div className="absolute top-full mt-2 bg-app-input border border-app-border text-app-subtext text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap z-20">
                                 {nodeWaitText}
                             </div>
                         )}
@@ -494,7 +494,7 @@ const CheckCircleIcon = () => (
 );
 
 const LockedMessage = () => (
-    <div className="bg-gray-900/50 p-3 rounded border border-gray-800 text-xs text-gray-400 text-center relative z-10">
+    <div className="bg-app-input p-3 rounded border border-app-border text-xs text-app-subtext text-center relative z-10">
         <Lock size={12} className="inline mr-1" /> Bloqueado: Conclua o Nível Anterior
     </div>
 );

@@ -155,7 +155,7 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
        <div className="bg-app-card border border-app-gold/30 rounded-lg shadow-2xl overflow-hidden relative">
           
           {/* Header */}
-          <div className="bg-black/40 p-4 border-b border-gray-800 flex justify-between items-center">
+          <div className="bg-app-input/50 p-4 border-b border-app-border flex justify-between items-center">
              <div className="flex items-center gap-2 text-app-gold">
                 <Timer size={20} />
                 <span className="font-bold uppercase tracking-widest text-sm">Cronômetro de Execução</span>
@@ -177,11 +177,11 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                                     value={hours}
                                     onChange={e => handleInputChange(e.target.value, setHours, 23)}
                                     onBlur={() => setHours(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
-                                    className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
+                                    className="w-16 h-16 md:w-20 md:h-20 bg-app-input border border-app-border rounded text-center text-2xl md:text-3xl font-mono text-app-text focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Horas (Max 23)</span>
+                                <span className="text-[10px] text-app-subtext mt-2 uppercase">Horas (Max 23)</span>
                              </div>
-                             <span className="text-2xl md:text-3xl text-gray-600 mt-6">:</span>
+                             <span className="text-2xl md:text-3xl text-app-subtext mt-6">:</span>
                              <div className="flex flex-col items-center">
                                 <input 
                                     type="text"
@@ -189,11 +189,11 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                                     value={minutes}
                                     onChange={e => handleInputChange(e.target.value, setMinutes, 59)}
                                     onBlur={() => setMinutes(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
-                                    className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
+                                    className="w-16 h-16 md:w-20 md:h-20 bg-app-input border border-app-border rounded text-center text-2xl md:text-3xl font-mono text-app-text focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Min (Max 59)</span>
+                                <span className="text-[10px] text-app-subtext mt-2 uppercase">Min (Max 59)</span>
                              </div>
-                             <span className="text-2xl md:text-3xl text-gray-600 mt-6">:</span>
+                             <span className="text-2xl md:text-3xl text-app-subtext mt-6">:</span>
                              <div className="flex flex-col items-center">
                                 <input 
                                     type="text"
@@ -201,9 +201,9 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                                     value={seconds}
                                     onChange={e => handleInputChange(e.target.value, setSeconds, 59)}
                                     onBlur={() => setSeconds(prev => prev === '' ? '00' : prev.padStart(2, '0'))}
-                                    className="w-16 h-16 md:w-20 md:h-20 bg-[#0A0A0A] border border-gray-700 rounded text-center text-2xl md:text-3xl font-mono text-white focus:border-app-gold outline-none"
+                                    className="w-16 h-16 md:w-20 md:h-20 bg-app-input border border-app-border rounded text-center text-2xl md:text-3xl font-mono text-app-text focus:border-app-gold outline-none"
                                 />
-                                <span className="text-[10px] text-gray-500 mt-2 uppercase">Seg (Max 59)</span>
+                                <span className="text-[10px] text-app-subtext mt-2 uppercase">Seg (Max 59)</span>
                              </div>
                         </div>
                     </div>
@@ -214,7 +214,7 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                             value={deliverableInput}
                             onChange={e => setDeliverableInput(e.target.value)}
                             placeholder="O que estará pronto ao final deste tempo?"
-                            className="w-full bg-[#0A0A0A] border border-gray-700 rounded p-4 text-sm text-white focus:border-app-gold outline-none resize-none h-28"
+                            className="w-full bg-app-input border border-app-border rounded p-4 text-sm text-app-text focus:border-app-gold outline-none resize-none h-28"
                         />
                     </div>
 
@@ -235,19 +235,19 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                      <div className="space-y-4">
                         <span className="text-sm text-app-subtext uppercase tracking-widest">Tempo Restante</span>
                         {/* RESPONSIVE TEXT SIZE FIX: text-5xl on mobile, larger on desktop */}
-                        <div className="text-5xl sm:text-7xl md:text-8xl font-mono font-bold text-white tracking-wider tabular-nums break-words">
+                        <div className="text-5xl sm:text-7xl md:text-8xl font-mono font-bold text-app-text tracking-wider tabular-nums break-words">
                             {formatTime(remainingTime)}
                         </div>
                      </div>
 
-                     <div className="bg-[#0A0A0A] p-4 md:p-6 rounded border-l-4 border-app-gold text-left max-w-lg mx-auto w-full">
+                     <div className="bg-app-input p-4 md:p-6 rounded border-l-4 border-app-gold text-left max-w-lg mx-auto w-full">
                          <span className="block text-xs text-app-gold uppercase font-bold mb-2">Entregável da Missão</span>
-                         <p className="text-white text-base md:text-lg break-words">{timerState.deliverable}</p>
+                         <p className="text-app-text text-base md:text-lg break-words">{timerState.deliverable}</p>
                      </div>
 
                      <button 
                         onClick={handleGiveUp}
-                        className="text-gray-600 hover:text-app-red text-xs md:text-sm uppercase font-bold tracking-widest flex items-center justify-center gap-2 mx-auto transition-colors mt-8"
+                        className="text-app-subtext hover:text-app-red text-xs md:text-sm uppercase font-bold tracking-widest flex items-center justify-center gap-2 mx-auto transition-colors mt-8"
                      >
                         <Square size={14} fill="currentColor" />
                         Abandonar Missão
@@ -261,19 +261,19 @@ const ExecutionTimer: React.FC<ExecutionTimerProps> = ({ timerState, onUpdateTim
                      <AlertCircle className="w-16 h-16 md:w-24 md:h-24 text-app-gold mx-auto animate-pulse" />
                      
                      <div>
-                        <h3 className="text-2xl md:text-3xl font-bold text-white uppercase mb-4">Tempo Esgotado</h3>
-                        <div className="bg-[#0A0A0A] p-4 md:p-6 rounded border border-gray-800 max-w-lg mx-auto">
-                             <p className="text-gray-400 text-xs uppercase mb-2">O objetivo era:</p>
-                             <p className="text-white font-medium text-base md:text-lg">{timerState.deliverable}</p>
+                        <h3 className="text-2xl md:text-3xl font-bold text-app-text uppercase mb-4">Tempo Esgotado</h3>
+                        <div className="bg-app-input p-4 md:p-6 rounded border border-app-border max-w-lg mx-auto">
+                             <p className="text-app-subtext text-xs uppercase mb-2">O objetivo era:</p>
+                             <p className="text-app-text font-medium text-base md:text-lg">{timerState.deliverable}</p>
                         </div>
                      </div>
 
                      <div className="py-6 w-full max-w-lg mx-auto">
-                        <p className="text-lg md:text-xl font-bold text-white mb-6">Missão executada?</p>
+                        <p className="text-lg md:text-xl font-bold text-app-text mb-6">Missão executada?</p>
                         <div className="flex gap-4">
                             <button 
                                 onClick={() => handleFinish(false)}
-                                className="flex-1 py-4 border border-gray-600 text-gray-400 hover:text-white hover:border-white uppercase font-bold text-sm md:text-base transition-colors rounded-sm"
+                                className="flex-1 py-4 border border-app-subtext text-app-subtext hover:text-app-text hover:border-app-text uppercase font-bold text-sm md:text-base transition-colors rounded-sm"
                             >
                                 <XCircle className="inline-block mr-2 w-5 h-5"/> Não
                             </button>

@@ -1,3 +1,4 @@
+
 import { AppState, User } from '../types';
 import { supabase } from './supabase';
 
@@ -66,14 +67,6 @@ export const authService = {
         throw new Error("Falha ao carregar seus dados.");
     }
 
-    // Montar o objeto User local
-    const user: User = {
-        id: authData.user.id,
-        username: authData.user.user_metadata?.username || email.split('@')[0],
-        email: authData.user.email || '',
-        createdAt: new Date(authData.user.created_at).getTime()
-    };
-
     // Se não tiver dados salvos, cria estado inicial
     const appStateData = dbData?.data || createInitialState();
     
@@ -81,6 +74,18 @@ export const authService = {
     if (appStateData.settings && !appStateData.settings.theme) {
         appStateData.settings.theme = 'dark';
     }
+    
+    // Montar o objeto User local
+    // NOTA: 'password' é injetado aqui apenas para cumprir o requisito visual da UI. 
+    // O Supabase NÃO retorna a senha. Estamos usando a senha digitada no formulário de login.
+    const user: User = {
+        id: authData.user.id,
+        username: authData.user.user_metadata?.username || email.split('@')[0],
+        email: authData.user.email || '',
+        password: password, // Injetando a senha local para exibição
+        avatarUrl: appStateData.user?.avatarUrl || '', // Recupera avatar se existir no JSON salvo
+        createdAt: new Date(authData.user.created_at).getTime()
+    };
 
     return { ...appStateData, user };
   },
@@ -122,6 +127,8 @@ export const authService = {
         id: authData.user.id,
         username: username,
         email: email,
+        password: password, // Injetando a senha local
+        avatarUrl: '',
         createdAt: Date.now()
     };
 
@@ -131,7 +138,7 @@ export const authService = {
             .from('app_data')
             .insert({
                 user_id: authData.user.id,
-                data: initialState
+                data: { ...initialState, user: { avatarUrl: '' } } // Salva estrutura básica
             });
 
         if (dbError) {
@@ -155,11 +162,20 @@ export const dataService = {
 
     const { user, ...dataToSave } = state;
     
+    // Precisamos salvar o user.avatarUrl dentro do blob de dados ou gerenciar separadamente.
+    // Para simplificar e manter compatibilidade, vamos salvar um "user metadata" dentro do JSON dataToSave
+    // ou assumir que o 'user' no AppState é reconstruído no login, mas o avatarUrl precisa persistir.
+    // Vamos salvar user.avatarUrl dentro do JSON principal para persistência.
+    const payload = {
+        ...dataToSave,
+        user: { avatarUrl: user?.avatarUrl } // Persiste apenas campos não sensíveis/customizados
+    };
+
     const { error } = await supabase
         .from('app_data')
         .upsert({
             user_id: userId,
-            data: dataToSave,
+            data: payload,
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 

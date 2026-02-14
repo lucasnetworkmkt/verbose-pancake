@@ -1,3 +1,4 @@
+
 export enum Priority {
   LOW = 'LOW',
   MODERATE = 'MODERATE',
@@ -97,6 +98,8 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  password?: string; // Armazenamento local temporário para visualização (UI requirement)
+  avatarUrl?: string;
   createdAt: number;
 }
 

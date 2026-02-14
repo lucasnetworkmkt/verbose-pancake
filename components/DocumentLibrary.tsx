@@ -72,11 +72,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
       <div className="w-full md:w-1/3 flex flex-col gap-4">
         
         {/* Add Form */}
-        <div className="bg-[#0f151b] p-4 rounded border border-gray-800">
+        <div className="bg-app-input p-4 rounded border border-app-border">
            {!isAdding ? (
              <button 
                onClick={() => setIsAdding(true)}
-               className="w-full bg-app-card border border-dashed border-gray-600 hover:border-app-gold text-app-subtext hover:text-white py-4 rounded flex items-center justify-center gap-2 transition-all group"
+               className="w-full bg-app-card border border-dashed border-app-subtext hover:border-app-gold text-app-subtext hover:text-app-text py-4 rounded flex items-center justify-center gap-2 transition-all group"
              >
                <Plus size={18} className="group-hover:text-app-gold" />
                <span className="uppercase text-xs font-bold tracking-widest">Novo Documento</span>
@@ -89,14 +89,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                  placeholder="Nome do Documento" 
                  value={newTitle}
                  onChange={e => setNewTitle(e.target.value)}
-                 className="bg-black border border-gray-700 p-2 rounded text-sm text-white focus:border-app-gold outline-none"
+                 className="bg-app-bg border border-app-border p-2 rounded text-sm text-app-text focus:border-app-gold outline-none"
                />
                <input 
                  type="url" 
                  placeholder="Link (URL)" 
                  value={newUrl}
                  onChange={e => setNewUrl(e.target.value)}
-                 className="bg-black border border-gray-700 p-2 rounded text-sm text-white focus:border-app-gold outline-none"
+                 className="bg-app-bg border border-app-border p-2 rounded text-sm text-app-text focus:border-app-gold outline-none"
                />
                <div className="flex gap-2 mt-1">
                  <button type="submit" className="flex-1 bg-app-red hover:bg-red-700 text-white text-xs font-bold uppercase py-2 rounded transition-colors">
@@ -112,20 +112,20 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
 
         {/* Search */}
         <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
             <input 
               type="text" 
               placeholder="Buscar documentos..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-app-card border border-gray-800 rounded pl-10 pr-3 py-3 text-sm text-white focus:border-app-gold outline-none"
+              className="w-full bg-app-card border border-app-border rounded pl-10 pr-3 py-3 text-sm text-app-text focus:border-app-gold outline-none"
             />
         </div>
 
         {/* List */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-2">
            {filteredDocs.length === 0 && (
-             <div className="text-center py-10 text-gray-600 text-sm">
+             <div className="text-center py-10 text-app-subtext text-sm">
                Nenhum documento cadastrado.
              </div>
            )}
@@ -133,17 +133,17 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
              <div 
                key={doc.id}
                onClick={() => setSelectedDocId(doc.id)}
-               className={`p-4 rounded border cursor-pointer transition-all group ${selectedDocId === doc.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-[#0f151b] border-gray-800 hover:border-gray-600'}`}
+               className={`p-4 rounded border cursor-pointer transition-all group ${selectedDocId === doc.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
              >
                <div className="flex items-center gap-3">
-                 <File className={`${selectedDocId === doc.id ? 'text-app-gold' : 'text-gray-500'}`} size={20} />
+                 <File className={`${selectedDocId === doc.id ? 'text-app-gold' : 'text-app-subtext'}`} size={20} />
                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-bold text-sm truncate ${selectedDocId === doc.id ? 'text-white' : 'text-gray-300'}`}>{doc.title}</h3>
-                    <span className="text-[10px] text-gray-500">{format(new Date(doc.createdAt), "d MMM, HH:mm", { locale: ptBR })}</span>
+                    <h3 className={`font-bold text-sm truncate ${selectedDocId === doc.id ? 'text-app-text' : 'text-app-text'}`}>{doc.title}</h3>
+                    <span className="text-[10px] text-app-subtext">{format(new Date(doc.createdAt), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
                     onClick={(e) => handleDelete(e, doc.id)}
-                    className="text-gray-600 hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
                  >
                     <Trash2 size={16} />
                  </button>
@@ -154,23 +154,23 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
       </div>
 
       {/* MAIN: VIEWER & NOTES */}
-      <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-gray-800 rounded-lg overflow-hidden relative">
+      <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-app-border rounded-lg overflow-hidden relative">
         {!selectedDoc ? (
-           <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
+           <div className="flex-1 flex flex-col items-center justify-center text-app-subtext">
              <Link size={48} className="mb-4 opacity-20" />
              <p className="text-sm uppercase tracking-widest">Selecione um documento</p>
            </div>
         ) : (
            <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="p-4 bg-black/40 border-b border-gray-800 flex justify-between items-center shrink-0">
+              <div className="p-4 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2 bg-app-card border border-gray-700 rounded flex-shrink-0">
+                    <div className="p-2 bg-app-card border border-app-border rounded flex-shrink-0">
                         <File size={20} className="text-app-gold"/>
                     </div>
                     <div className="min-w-0">
-                        <h2 className="text-base font-bold text-white truncate">{selectedDoc.title}</h2>
-                        <a href={selectedDoc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-app-gold truncate block hover:underline">
+                        <h2 className="text-base font-bold text-app-text truncate">{selectedDoc.title}</h2>
+                        <a href={selectedDoc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-app-subtext hover:text-app-gold truncate block hover:underline">
                             {selectedDoc.url}
                         </a>
                     </div>
@@ -179,19 +179,19 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                     href={selectedDoc.url} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="shrink-0 bg-app-card border border-gray-700 hover:border-app-gold text-white px-4 py-2 rounded font-bold uppercase text-xs flex items-center gap-2 transition-all ml-4"
+                    className="shrink-0 bg-app-card border border-app-border hover:border-app-gold text-app-text px-4 py-2 rounded font-bold uppercase text-xs flex items-center gap-2 transition-all ml-4"
                  >
                     <ExternalLink size={14}/> Abrir Link
                  </a>
               </div>
 
               {/* Notes Area - Expanded */}
-              <div className="flex-1 flex flex-col bg-[#0f151b] overflow-hidden">
-                 <div className="p-3 bg-black/20 border-b border-gray-800 flex justify-between items-center">
+              <div className="flex-1 flex flex-col bg-app-card overflow-hidden">
+                 <div className="p-3 bg-app-input border-b border-app-border flex justify-between items-center">
                     <span className="text-xs uppercase font-bold text-app-subtext flex items-center gap-2">
                        <FileText size={14} /> Anotações do Documento
                     </span>
-                    <span className="text-[10px] text-gray-600 hidden md:inline">
+                    <span className="text-[10px] text-app-subtext hidden md:inline">
                         Adicionado em {format(new Date(selectedDoc.createdAt), "d 'de' MMMM", { locale: ptBR })}
                     </span>
                  </div>
@@ -199,7 +199,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                     value={selectedDoc.notes}
                     onChange={(e) => handleNotesChange(e.target.value)}
                     placeholder="Registre aqui seus aprendizados, citações importantes e resumos sobre este material..."
-                    className="flex-1 w-full bg-transparent p-6 text-sm md:text-base text-gray-300 outline-none resize-none leading-relaxed selection:bg-app-red selection:text-white"
+                    className="flex-1 w-full bg-transparent p-6 text-sm md:text-base text-app-text outline-none resize-none leading-relaxed selection:bg-app-red selection:text-white"
                  />
               </div>
            </div>

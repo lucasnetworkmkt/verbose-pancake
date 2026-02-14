@@ -22,7 +22,9 @@ import {
   WifiOff,
   MapPin,
   X,
-  Mic
+  Mic,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState } from './types';
 import { authService, dataService } from './services/storage';
@@ -87,8 +89,8 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
-      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-subtext/20">
-        <h1 className="text-3xl font-bold text-center text-white mb-2">CÓDIGO DA EXECUÇÃO</h1>
+      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border">
+        <h1 className="text-3xl font-bold text-center text-app-text mb-2">CÓDIGO DA EXECUÇÃO</h1>
         <p className="text-center text-app-subtext mb-8 text-sm">Sistema de Controle & Disciplina</p>
         
         {error && (
@@ -104,7 +106,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
               <input 
                 type="text" 
                 required 
-                className="w-full bg-app-bg border border-gray-700 text-white p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
+                className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
               />
@@ -115,7 +117,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
             <input 
               type="email" 
               required 
-              className="w-full bg-app-bg border border-gray-700 text-white p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
+              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
               value={email}
               onChange={e => setEmail(e.target.value)}
             />
@@ -125,7 +127,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
             <input 
               type="password" 
               required 
-              className="w-full bg-app-bg border border-gray-700 text-white p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
+              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
@@ -143,7 +145,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
         <div className="mt-6 text-center">
           <button 
             onClick={() => { setIsRegister(!isRegister); setError(''); }}
-            className="text-app-subtext hover:text-white text-sm underline"
+            className="text-app-subtext hover:text-app-text text-sm underline"
           >
             {isRegister ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastrar'}
           </button>
@@ -151,6 +153,24 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
       </div>
     </div>
   );
+};
+
+// --- Theme Toggle Button Component ---
+const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light', onToggle: () => void }) => {
+    return (
+        <button 
+            onClick={onToggle}
+            className="relative p-2 rounded-full border border-app-border hover:border-app-gold bg-app-input transition-all duration-300 group overflow-hidden w-10 h-10 flex items-center justify-center shadow-sm"
+            title={theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+        >
+            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'}`}>
+                <Sun size={20} className="text-app-gold" />
+            </div>
+            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? '-rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'}`}>
+                <Moon size={20} className="text-blue-500" />
+            </div>
+        </button>
+    );
 };
 
 // --- Main App Logic ---
@@ -173,6 +193,16 @@ function App() {
     }
   }, [appState]);
 
+  // Apply Theme Effect
+  useEffect(() => {
+      if (appState?.settings?.theme) {
+          document.documentElement.setAttribute('data-theme', appState.settings.theme);
+      } else {
+          // Default fallback
+          document.documentElement.setAttribute('data-theme', 'dark');
+      }
+  }, [appState?.settings?.theme]);
+
   // Check for daily check-in
   useEffect(() => {
     if (appState && appState.user) {
@@ -193,6 +223,20 @@ function App() {
 
   const handleLogout = () => {
     setAppState(null);
+  };
+
+  const handleToggleTheme = () => {
+      setAppState(prev => {
+          if(!prev) return null;
+          const newTheme = prev.settings.theme === 'dark' ? 'light' : 'dark';
+          return {
+              ...prev,
+              settings: {
+                  ...prev.settings,
+                  theme: newTheme
+              }
+          };
+      });
   };
 
   const handleCheckInComplete = () => {
@@ -692,7 +736,7 @@ function App() {
   startOfCurrentMonth.setHours(0,0,0,0);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden">
+    <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal 
         isOpen={showCheckIn} 
         onClose={handleCheckInComplete} 
@@ -718,10 +762,10 @@ function App() {
       />
 
       {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 flex-col border-r border-gray-800 bg-black/50 backdrop-blur z-20">
+      <aside className="hidden md:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
         <div className="p-6 flex items-center gap-3">
           <div className="w-8 h-8 bg-app-red rounded-sm flex items-center justify-center font-bold text-white">C</div>
-          <span className="font-bold text-lg tracking-tighter">CÓDIGO</span>
+          <span className="font-bold text-lg tracking-tighter text-app-text">CÓDIGO</span>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-8">
@@ -734,7 +778,7 @@ function App() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`w-full flex items-center gap-4 p-3 rounded transition-all duration-200 relative ${isActive ? 'bg-app-card text-app-red border-l-2 border-app-red' : 'text-app-subtext hover:text-white hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-4 p-3 rounded transition-all duration-200 relative ${isActive ? 'bg-app-nav-active text-app-red border-l-2 border-app-red shadow-sm' : 'text-app-subtext hover:text-app-text hover:bg-app-hover'}`}
               >
                 <item.icon size={20} className={showPulse ? 'text-app-gold' : ''} />
                 <span className={`font-medium text-sm uppercase ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Hist' ? 'Histórico' : (item.label === 'Timer' ? 'Cronômetro' : item.label)}</span>
@@ -746,8 +790,13 @@ function App() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-800">
-          <button onClick={handleLogout} className="flex items-center gap-4 text-app-subtext hover:text-white transition-colors w-full p-2">
+        <div className="p-4 border-t border-app-border space-y-4">
+           {/* Theme Toggle Button Desktop */}
+           <div className="flex justify-center">
+               <ThemeToggle theme={appState.settings.theme} onToggle={handleToggleTheme} />
+           </div>
+
+          <button onClick={handleLogout} className="flex items-center gap-4 text-app-subtext hover:text-app-text transition-colors w-full p-2">
             <LogOut size={20} />
             <span className="text-sm">Sair</span>
           </button>
@@ -757,14 +806,17 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         {/* Header - Mobile Only */}
-        <header className="md:hidden p-4 border-b border-gray-800 flex justify-between items-center bg-app-bg z-30 shrink-0">
+        <header className="md:hidden p-4 border-b border-app-border flex justify-between items-center bg-app-bg z-30 shrink-0">
             <div className="flex items-center gap-2">
                 <div className="w-6 h-6 bg-app-red rounded-sm flex items-center justify-center font-bold text-white text-xs">C</div>
-                <span className="font-bold">CÓDIGO DA EXECUÇÃO</span>
+                <span className="font-bold text-app-text">CÓDIGO DA EXECUÇÃO</span>
             </div>
-            <button onClick={handleLogout} className="text-app-subtext hover:text-app-red">
-                <LogOut size={20} />
-            </button>
+            <div className="flex items-center gap-4">
+                <ThemeToggle theme={appState.settings.theme} onToggle={handleToggleTheme} />
+                <button onClick={handleLogout} className="text-app-subtext hover:text-app-red">
+                    <LogOut size={20} />
+                </button>
+            </div>
         </header>
 
         {/* Scrollable Content */}
@@ -787,11 +839,11 @@ function App() {
               <div className="lg:col-span-2 space-y-6 md:space-y-8">
                 
                 {/* Streak Banner */}
-                <div className="bg-app-card p-4 md:p-6 rounded border-l-4 border-app-gold flex items-center justify-between">
+                <div className="bg-app-card p-4 md:p-6 rounded border-l-4 border-app-gold flex items-center justify-between shadow-sm">
                   <div>
                     <h2 className="text-app-subtext text-xs uppercase tracking-widest mb-1">Sequência de Execução</h2>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold text-white">{streak}</span>
+                      <span className="text-4xl font-bold text-app-text">{streak}</span>
                       <span className="text-app-gold font-medium">DIAS</span>
                     </div>
                   </div>
@@ -799,7 +851,7 @@ function App() {
                 </div>
 
                 {/* Day Mode Selector */}
-                <div className="bg-app-card p-4 md:p-6 rounded border border-gray-800">
+                <div className="bg-app-card p-4 md:p-6 rounded border border-app-border shadow-sm">
                   <h3 className="text-sm uppercase text-app-subtext mb-4 font-bold">Modo do Dia</h3>
                   <div className="grid grid-cols-3 gap-2 md:gap-4">
                     {[
@@ -810,7 +862,7 @@ function App() {
                         <button
                             key={m.mode}
                             onClick={() => setDayMode(m.mode)}
-                            className={`p-2 md:p-3 rounded text-xs md:text-sm font-bold uppercase transition-all ${todayLog?.mode === m.mode ? `ring-2 ring-white ${m.color}` : 'bg-[#0f151b] text-gray-500 hover:bg-[#1C2834]'}`}
+                            className={`p-2 md:p-3 rounded text-xs md:text-sm font-bold uppercase transition-all ${todayLog?.mode === m.mode ? `ring-2 ring-white ${m.color} text-white` : 'bg-app-input text-app-subtext hover:bg-app-hover'}`}
                         >
                             {m.label}
                         </button>
@@ -821,7 +873,7 @@ function App() {
                 {/* Mentor Help Button */}
                 <button 
                   onClick={() => setShowMentorModal(true)}
-                  className="w-full bg-app-card border border-gray-700 hover:border-app-gold text-app-subtext hover:text-white p-4 rounded flex items-center justify-center gap-3 transition-all group shadow-md"
+                  className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-4 rounded flex items-center justify-center gap-3 transition-all group shadow-sm hover:shadow-md"
                 >
                   <div className="p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors">
                     <Mic size={20} className="text-app-gold group-hover:scale-110 transition-transform" />
@@ -832,7 +884,7 @@ function App() {
                 {/* Today's Routines */}
                 <div>
                    <div className="flex items-center justify-between mb-4">
-                       <h3 className="text-lg md:text-xl font-bold text-white">Rotinas de Hoje</h3>
+                       <h3 className="text-lg md:text-xl font-bold text-app-text">Rotinas de Hoje</h3>
                        <span className="text-xs text-app-subtext bg-app-card px-2 py-1 rounded">
                            {todayLog?.completedRoutineIds.length || 0} / {appState.routines.length}
                        </span>
@@ -882,9 +934,9 @@ function App() {
                  )}
 
                  {/* Mini Calendar */}
-                 <div className="bg-app-card p-6 rounded border border-gray-800">
+                 <div className="bg-app-card p-6 rounded border border-app-border shadow-sm">
                     <h3 className="text-sm uppercase text-app-subtext mb-4 font-bold">Visão Mensal</h3>
-                    <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-2">
+                    <div className="grid grid-cols-7 gap-1 text-center text-xs text-app-subtext mb-2">
                         {['D','S','T','Q','Q','S','S'].map((d,i) => <div key={i}>{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1">
@@ -894,10 +946,10 @@ function App() {
                         }).map(day => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const log = appState.dayLogs[dStr];
-                            let bgClass = 'bg-[#0f151b]';
+                            let bgClass = 'bg-app-input text-app-subtext';
                             if (log?.isValid) bgClass = 'bg-app-gold text-black font-bold';
-                            else if (log?.completedRoutineIds.length > 0) bgClass = 'bg-gray-700 text-white';
-                            else if (isToday(day)) bgClass = 'border border-white text-white';
+                            else if (log?.completedRoutineIds.length > 0) bgClass = 'bg-gray-600 text-white';
+                            else if (isToday(day)) bgClass = 'border border-app-text text-app-text';
 
                             return (
                                 <div key={dStr} className={`aspect-square flex items-center justify-center rounded-sm cursor-default ${bgClass} text-xs`}>
@@ -909,7 +961,7 @@ function App() {
                  </div>
 
                  {/* Active Goals Summary */}
-                 <div className="bg-app-card p-6 rounded border border-gray-800">
+                 <div className="bg-app-card p-6 rounded border border-app-border shadow-sm">
                     <h3 className="text-sm uppercase text-app-subtext mb-4 font-bold">Foco Atual</h3>
                     {appState.goals.length === 0 ? (
                         <p className="text-app-subtext text-sm italic">Nenhuma meta ativa.</p>
@@ -918,10 +970,10 @@ function App() {
                             {appState.goals.slice(0, 3).map(goal => (
                                 <div key={goal.id} className={`border-l-2 pl-3 ${getPriorityBorderClass(goal.priority).replace('border-l-4', 'border-l-2')}`}>
                                     <div className="flex justify-between items-start mb-1">
-                                        <span className="text-white font-medium text-sm">{goal.title}</span>
+                                        <span className="text-app-text font-medium text-sm">{goal.title}</span>
                                         <span className="text-[10px] bg-black border border-gray-700 px-1 rounded text-gray-400">{goal.deadline.slice(5)}</span>
                                     </div>
-                                    <div className="w-full bg-gray-800 h-1 rounded-full mt-2">
+                                    <div className="w-full bg-app-input h-1 rounded-full mt-2">
                                         <div 
                                             className="bg-app-gold h-1 rounded-full" 
                                             style={{ width: `${goal.tasks.length > 0 ? (goal.tasks.filter(t => t.isCompleted).length / goal.tasks.length) * 100 : 0}%`}}
@@ -954,9 +1006,9 @@ function App() {
           {/* ROUTINES MANAGEMENT */}
           {activeTab === 'ROUTINES' && (
              <div className="max-w-2xl mx-auto">
-                 <h2 className="text-xl md:text-2xl font-bold mb-6">Editor de Rotinas</h2>
+                 <h2 className="text-xl md:text-2xl font-bold mb-6 text-app-text">Editor de Rotinas</h2>
                  
-                 <div className="bg-app-card p-4 md:p-6 rounded mb-8 border border-gray-800">
+                 <div className="bg-app-card p-4 md:p-6 rounded mb-8 border border-app-border shadow-sm">
                      <form onSubmit={(e) => {
                          e.preventDefault();
                          const form = e.target as HTMLFormElement;
@@ -967,24 +1019,24 @@ function App() {
                          addRoutine(title, priority, cat, goalId || undefined);
                          form.reset();
                      }} className="flex flex-col gap-4">
-                         <input name="title" placeholder="Nova rotina..." className="bg-[#0f151b] p-3 text-white border border-gray-700 rounded focus:border-app-red outline-none" required />
+                         <input name="title" placeholder="Nova rotina..." className="bg-app-input p-3 text-app-text border border-app-border rounded focus:border-app-red outline-none" required />
                          <div className="flex flex-col md:flex-row gap-4">
-                             <select name="priority" className="bg-[#0f151b] p-3 text-white border border-gray-700 rounded outline-none flex-1">
+                             <select name="priority" className="bg-app-input p-3 text-app-text border border-app-border rounded outline-none flex-1">
                                  <option value={Priority.HIGH}>Alta (Vermelho)</option>
                                  <option value={Priority.MODERATE}>Moderada (Dourado)</option>
                                  <option value={Priority.LOW}>Baixa (Cinza)</option>
                              </select>
-                             <select name="category" className="bg-[#0f151b] p-3 text-white border border-gray-700 rounded outline-none flex-1">
+                             <select name="category" className="bg-app-input p-3 text-app-text border border-app-border rounded outline-none flex-1">
                                  {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
                              </select>
                          </div>
                          <div>
-                            <select name="goalId" className="w-full bg-[#0f151b] p-3 text-white border border-gray-700 rounded outline-none">
+                            <select name="goalId" className="w-full bg-app-input p-3 text-app-text border border-app-border rounded outline-none">
                                 <option value="">-- Associar a uma Meta (Opcional) --</option>
                                 {appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
                             </select>
                          </div>
-                         <button className="bg-white text-black font-bold uppercase p-3 hover:bg-gray-200 transition-colors">Adicionar Rotina</button>
+                         <button className="bg-app-text text-app-bg font-bold uppercase p-3 hover:opacity-80 transition-colors">Adicionar Rotina</button>
                      </form>
                  </div>
 
@@ -1007,7 +1059,7 @@ function App() {
           {activeTab === 'METAS' && (
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl md:text-2xl font-bold">Metas & Objetivos</h2>
+                    <h2 className="text-xl md:text-2xl font-bold text-app-text">Metas & Objetivos</h2>
                     <button 
                         onClick={() => setShowGoalCreator(true)}
                         className="bg-app-red text-white px-3 py-2 md:px-4 text-xs md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded">
@@ -1023,18 +1075,18 @@ function App() {
                             : 0;
 
                         return (
-                            <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-gray-800 p-4 md:p-6 rounded shadow-lg relative group`}>
+                            <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-app-border p-4 md:p-6 rounded shadow-lg relative group`}>
                                 {/* Header */}
                                 <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
                                     <div className="space-y-1 w-full">
                                         <div className="flex items-center justify-between md:justify-start gap-3">
-                                            <h3 className="text-xl md:text-2xl font-bold text-white truncate">{goal.title}</h3>
+                                            <h3 className="text-xl md:text-2xl font-bold text-app-text truncate">{goal.title}</h3>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
                                                 {/* DELETE GOAL BUTTON */}
                                                 <button 
                                                     onClick={(e) => deleteGoal(e, goal.id)}
-                                                    className="p-1 text-gray-600 hover:text-app-red transition-colors"
+                                                    className="p-1 text-app-subtext hover:text-app-red transition-colors"
                                                     title="Excluir Meta"
                                                 >
                                                     <Trash2 size={16} />
@@ -1044,18 +1096,18 @@ function App() {
                                         <p className="text-app-subtext text-sm max-w-xl">{goal.description}</p>
                                     </div>
                                     <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                        <span className="bg-black px-3 py-1 text-xs rounded text-white border border-gray-700 uppercase tracking-wider">{goal.category}</span>
+                                        <span className="bg-app-input px-3 py-1 text-xs rounded text-app-text border border-app-border uppercase tracking-wider">{goal.category}</span>
                                         <span className="text-xs text-app-red font-bold flex items-center gap-1"><Clock size={12}/> {goal.deadline}</span>
                                     </div>
                                 </div>
 
                                 {/* Progress Bar */}
                                 <div className="mb-6">
-                                    <div className="flex justify-between text-xs uppercase text-gray-500 mb-1">
+                                    <div className="flex justify-between text-xs uppercase text-app-subtext mb-1">
                                         <span>Progresso</span>
                                         <span>{progress}%</span>
                                     </div>
-                                    <div className="w-full bg-black h-2 rounded-full border border-gray-800">
+                                    <div className="w-full bg-app-input h-2 rounded-full border border-app-border">
                                         <div 
                                             className="bg-app-gold h-full rounded-full transition-all duration-500" 
                                             style={{ width: `${progress}%`}}
@@ -1064,18 +1116,18 @@ function App() {
                                 </div>
 
                                 {/* Tasks Area */}
-                                <div className="bg-[#0A0A0A] p-4 rounded border border-gray-800">
+                                <div className="bg-app-input p-4 rounded border border-app-border">
                                     <h4 className="text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2">
                                         <ListTodo size={14}/> Micro Tarefas
                                     </h4>
                                     
                                     <div className="space-y-2 mb-4">
-                                        {goal.tasks.length === 0 && <p className="text-gray-600 text-sm italic">Nenhuma micro tarefa definida.</p>}
+                                        {goal.tasks.length === 0 && <p className="text-app-subtext text-sm italic">Nenhuma micro tarefa definida.</p>}
                                         {goal.tasks.map(task => (
                                             <div key={task.id} className="flex items-center gap-3 group">
                                                 <button 
                                                     onClick={() => toggleGoalTask(goal.id, task.id)}
-                                                    className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-gray-600 hover:border-gray-400'}`}
+                                                    className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}
                                                 >
                                                     {task.isCompleted && <Check size={14} className="text-black"/>}
                                                 </button>
@@ -1084,17 +1136,17 @@ function App() {
                                                     type="time" 
                                                     value={task.time} 
                                                     onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)}
-                                                    className="bg-transparent text-xs text-gray-500 border-b border-gray-800 focus:border-app-gold outline-none w-20 text-center shrink-0 cursor-pointer"
+                                                    className="bg-transparent text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-20 text-center shrink-0 cursor-pointer"
                                                 />
 
-                                                <span className={`flex-1 text-sm truncate ${task.isCompleted ? 'text-gray-600 line-through' : 'text-gray-300'}`}>
+                                                <span className={`flex-1 text-sm truncate ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>
                                                     {task.title}
                                                 </span>
                                                 
                                                 {/* ADDED DELETE BUTTON */}
                                                 <button 
                                                     onClick={() => deleteGoalTask(goal.id, task.id)}
-                                                    className="text-gray-500 hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
                                                     title="Excluir tarefa"
                                                 >
                                                     <Trash2 size={14} />
@@ -1113,12 +1165,12 @@ function App() {
                                                 input.value = '';
                                             }
                                         }}
-                                        className="flex gap-2 border-t border-gray-800 pt-3"
+                                        className="flex gap-2 border-t border-app-border pt-3"
                                     >
                                         <input 
                                             name="taskTitle"
                                             placeholder="+ Tarefa" 
-                                            className="bg-transparent flex-1 text-sm text-white placeholder-gray-600 outline-none min-w-0"
+                                            className="bg-transparent flex-1 text-sm text-app-text placeholder-app-subtext outline-none min-w-0"
                                         />
                                         <button className="text-xs text-app-gold uppercase font-bold hover:text-white shrink-0">
                                             <span className="hidden md:inline">Adicionar</span>
@@ -1136,23 +1188,23 @@ function App() {
           {/* HISTORY TAB */}
           {activeTab === 'HISTORY' && (
               <div className="max-w-4xl mx-auto">
-                  <h2 className="text-2xl font-bold mb-6">Histórico de Consistência</h2>
+                  <h2 className="text-2xl font-bold mb-6 text-app-text">Histórico de Consistência</h2>
                   
-                  <div className="bg-app-card p-6 rounded border border-gray-800 mb-8">
+                  <div className="bg-app-card p-6 rounded border border-app-border mb-8 shadow-sm">
                       <h3 className="text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3>
                       <HistoryChart logs={appState.dayLogs} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="bg-app-card p-8 rounded border border-gray-800 flex flex-col items-center justify-center text-center">
+                      <div className="bg-app-card p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm">
                           <AlertOctagon size={48} className="text-app-red mb-4" />
-                          <div className="text-5xl font-bold text-white mb-2">{Object.values(appState.dayLogs).filter((l: DayLog) => l.isValid).length}</div>
+                          <div className="text-5xl font-bold text-app-text mb-2">{Object.values(appState.dayLogs).filter((l: DayLog) => l.isValid).length}</div>
                           <p className="text-app-subtext uppercase text-sm tracking-widest">Dias Válidos Totais</p>
                       </div>
 
-                      <div className="bg-app-card p-8 rounded border border-gray-800 flex flex-col items-center justify-center text-center">
+                      <div className="bg-app-card p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm">
                           <Target size={48} className="text-app-gold mb-4" />
-                          <div className="text-5xl font-bold text-white mb-2">{streak}</div>
+                          <div className="text-5xl font-bold text-app-text mb-2">{streak}</div>
                           <p className="text-app-subtext uppercase text-sm tracking-widest">Melhor Sequência</p>
                       </div>
                   </div>
@@ -1190,7 +1242,7 @@ function App() {
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0f151b] border-t border-gray-800 flex justify-around items-stretch z-50 pb-safe shadow-2xl safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-stretch z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
         {NAV_ITEMS.map((item) => {
            const isActive = activeTab === item.id;
            const isTimerLink = item.id === 'TIMER';
@@ -1200,7 +1252,7 @@ function App() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
-              className={`flex flex-col items-center justify-center flex-1 gap-1 transition-all relative ${isActive ? 'text-app-gold bg-white/5 border-t-2 border-app-gold' : 'text-gray-500 hover:text-gray-300 border-t-2 border-transparent'}`}
+              className={`flex flex-col items-center justify-center flex-1 gap-1 transition-all relative ${isActive ? 'text-app-gold bg-app-nav-active border-t-2 border-app-gold' : 'text-app-subtext hover:text-app-text border-t-2 border-transparent'}`}
             >
               <item.icon size={20} className={showPulse ? 'text-app-gold' : ''} />
               <span className={`text-[9px] uppercase font-bold tracking-wider ${showPulse ? 'text-app-gold' : ''}`}>

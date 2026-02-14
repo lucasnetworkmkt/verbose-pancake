@@ -90,7 +90,7 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="w-full bg-app-card border border-dashed border-gray-600 hover:border-app-gold text-app-subtext hover:text-white p-6 rounded flex flex-col items-center justify-center transition-all group"
+            className="w-full bg-app-card border border-dashed border-app-subtext hover:border-app-gold text-app-subtext hover:text-app-text p-6 rounded flex flex-col items-center justify-center transition-all group"
           >
             <Upload size={24} className="mb-2 group-hover:text-app-gold" />
             <span className="uppercase text-xs font-bold tracking-widest">
@@ -99,13 +99,13 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
           </button>
 
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
             <input 
               type="text" 
               placeholder="Buscar arquivos..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-app-card border border-gray-800 rounded pl-10 pr-3 py-3 text-sm text-white focus:border-app-gold outline-none"
+              className="w-full bg-app-card border border-app-border rounded pl-10 pr-3 py-3 text-sm text-app-text focus:border-app-gold outline-none"
             />
           </div>
         </div>
@@ -113,7 +113,7 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
         {/* List */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-2">
            {filteredPdfs.length === 0 && (
-             <div className="text-center py-10 text-gray-600 text-sm">
+             <div className="text-center py-10 text-app-subtext text-sm">
                Biblioteca vazia.
              </div>
            )}
@@ -121,17 +121,17 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
              <div 
                key={pdf.id}
                onClick={() => setSelectedPdfId(pdf.id)}
-               className={`p-4 rounded border cursor-pointer transition-all group ${selectedPdfId === pdf.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-[#0f151b] border-gray-800 hover:border-gray-600'}`}
+               className={`p-4 rounded border cursor-pointer transition-all group ${selectedPdfId === pdf.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
              >
                <div className="flex items-center gap-3">
-                 <File className={`${selectedPdfId === pdf.id ? 'text-app-gold' : 'text-gray-500'}`} size={20} />
+                 <File className={`${selectedPdfId === pdf.id ? 'text-app-gold' : 'text-app-subtext'}`} size={20} />
                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-bold text-sm truncate ${selectedPdfId === pdf.id ? 'text-white' : 'text-gray-300'}`}>{pdf.fileName}</h3>
-                    <span className="text-[10px] text-gray-500">{format(new Date(pdf.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
+                    <h3 className={`font-bold text-sm truncate ${selectedPdfId === pdf.id ? 'text-app-text' : 'text-app-text'}`}>{pdf.fileName}</h3>
+                    <span className="text-[10px] text-app-subtext">{format(new Date(pdf.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
                     onClick={(e) => handleDelete(e, pdf.id)}
-                    className="text-gray-600 hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
                  >
                     <Trash2 size={16} />
                  </button>
@@ -142,17 +142,17 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
       </div>
 
       {/* MAIN: VIEWER & NOTES */}
-      <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-gray-800 rounded-lg overflow-hidden relative">
+      <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-app-border rounded-lg overflow-hidden relative">
         {!selectedPdf ? (
-           <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
+           <div className="flex-1 flex flex-col items-center justify-center text-app-subtext">
              <File size={48} className="mb-4 opacity-20" />
              <p className="text-sm uppercase tracking-widest">Selecione um arquivo PDF</p>
            </div>
         ) : (
            <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="p-3 bg-black/40 border-b border-gray-800 flex justify-between items-center shrink-0">
-                 <h2 className="text-sm font-bold text-white truncate max-w-[70%]">{selectedPdf.fileName}</h2>
+              <div className="p-3 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
+                 <h2 className="text-sm font-bold text-app-text truncate max-w-[70%]">{selectedPdf.fileName}</h2>
                  <a href={selectedPdf.dataUrl} download={selectedPdf.fileName} className="text-xs text-app-gold hover:underline flex items-center gap-1">
                     <Download size={12}/> Baixar
                  </a>
@@ -174,8 +174,8 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
                  </div>
 
                  {/* Notes Area */}
-                 <div className="h-[40%] md:h-full md:w-[35%] bg-[#0f151b] border-t md:border-t-0 md:border-l border-gray-800 flex flex-col">
-                    <div className="p-2 bg-black/20 border-b border-gray-800">
+                 <div className="h-[40%] md:h-full md:w-[35%] bg-app-card border-t md:border-t-0 md:border-l border-app-border flex flex-col">
+                    <div className="p-2 bg-app-input border-b border-app-border">
                        <span className="text-xs uppercase font-bold text-app-subtext flex items-center gap-2">
                           <FileText size={12} /> Anotações do Arquivo
                        </span>
@@ -184,7 +184,7 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
                        value={selectedPdf.notes}
                        onChange={(e) => handleNotesChange(e.target.value)}
                        placeholder="Anote insights importantes deste documento..."
-                       className="flex-1 w-full bg-transparent p-4 text-sm text-gray-300 outline-none resize-none leading-relaxed"
+                       className="flex-1 w-full bg-transparent p-4 text-sm text-app-text outline-none resize-none leading-relaxed"
                     />
                  </div>
               </div>

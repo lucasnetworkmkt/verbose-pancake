@@ -97,6 +97,7 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  avatarUrl?: string; // Novo campo para foto de perfil
   createdAt: number;
 }
 

@@ -113,16 +113,16 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   return (
     <div className="h-full flex flex-col gap-4">
         {/* Main Section Tabs */}
-        <div className="flex gap-4 border-b border-gray-800 pb-2">
+        <div className="flex gap-4 border-b border-app-border pb-2">
             <button 
                 onClick={() => setActiveTab('TEXT')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'TEXT' ? 'text-white border-b-2 border-app-red' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'TEXT' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
             >
                 <FileText size={16} /> Registros de Texto
             </button>
             <button 
                 onClick={() => setActiveTab('DOCS')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'DOCS' ? 'text-white border-b-2 border-app-red' : 'text-gray-500 hover:text-gray-300'}`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'DOCS' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
             >
                 <Link size={16} /> Biblioteca de Documentos
             </button>
@@ -142,13 +142,13 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 {/* Actions Bar */}
                 <div className="flex gap-2">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
                     <input 
                     type="text" 
                     placeholder="Buscar registros..." 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full bg-app-card border border-gray-800 rounded pl-10 pr-3 py-3 text-sm text-white focus:border-app-gold outline-none"
+                    className="w-full bg-app-card border border-app-border rounded pl-10 pr-3 py-3 text-sm text-app-text focus:border-app-gold outline-none"
                     />
                 </div>
                 <button 
@@ -164,7 +164,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
                 <button 
                     onClick={() => setCategoryFilter('ALL')}
-                    className={`px-3 py-1 text-xs uppercase font-bold rounded border whitespace-nowrap transition-colors ${categoryFilter === 'ALL' ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-700 hover:border-gray-500'}`}
+                    className={`px-3 py-1 text-xs uppercase font-bold rounded border whitespace-nowrap transition-colors ${categoryFilter === 'ALL' ? 'bg-app-text text-app-bg border-app-text' : 'bg-transparent text-app-subtext border-app-border hover:border-app-subtext'}`}
                 >
                     Todos
                 </button>
@@ -172,7 +172,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     <button 
                     key={cat}
                     onClick={() => setCategoryFilter(cat)}
-                    className={`px-3 py-1 text-xs uppercase font-bold rounded border whitespace-nowrap transition-colors ${categoryFilter === cat ? 'bg-app-card text-app-gold border-app-gold' : 'bg-transparent text-gray-500 border-gray-700 hover:border-gray-500'}`}
+                    className={`px-3 py-1 text-xs uppercase font-bold rounded border whitespace-nowrap transition-colors ${categoryFilter === cat ? 'bg-app-card text-app-gold border-app-gold' : 'bg-transparent text-app-subtext border-app-border hover:border-app-subtext'}`}
                     >
                     {cat}
                     </button>
@@ -182,7 +182,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 {/* List */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                 {filteredNotes.length === 0 && (
-                    <div className="text-center py-10 text-gray-600 text-sm">
+                    <div className="text-center py-10 text-app-subtext text-sm">
                     Nenhum registro encontrado.
                     </div>
                 )}
@@ -190,19 +190,19 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     <div 
                     key={note.id}
                     onClick={() => setSelectedNoteId(note.id)}
-                    className={`p-4 rounded border cursor-pointer transition-all group ${selectedNoteId === note.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-[#0f151b] border-gray-800 hover:border-gray-600'}`}
+                    className={`p-4 rounded border cursor-pointer transition-all group ${selectedNoteId === note.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
                     >
                     <div className="flex justify-between items-start mb-2">
-                        <h3 className={`font-bold text-sm ${selectedNoteId === note.id ? 'text-white' : 'text-gray-300'}`}>{note.title}</h3>
-                        <span className="text-[10px] text-gray-500">{format(new Date(note.updatedAt), "d MMM", { locale: ptBR })}</span>
+                        <h3 className={`font-bold text-sm ${selectedNoteId === note.id ? 'text-app-text' : 'text-app-text'}`}>{note.title}</h3>
+                        <span className="text-[10px] text-app-subtext">{format(new Date(note.updatedAt), "d MMM", { locale: ptBR })}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-wider bg-black px-2 py-0.5 rounded text-gray-400 border border-gray-800">
+                        <span className="text-[10px] uppercase tracking-wider bg-app-bg px-2 py-0.5 rounded text-app-subtext border border-app-border">
                         {note.category}
                         </span>
                         <button 
                         onClick={(e) => handleDelete(e, note.id)}
-                        className="text-gray-500 hover:text-app-red transition-colors"
+                        className="text-app-subtext hover:text-app-red transition-colors"
                         title="Excluir"
                         >
                         <Trash2 size={16} />
@@ -214,16 +214,16 @@ const NotesManager: React.FC<NotesManagerProps> = ({
             </div>
 
             {/* RIGHT COLUMN: EDITOR */}
-            <div className="w-full md:w-2/3 bg-app-card border border-gray-800 rounded-lg flex flex-col overflow-hidden relative">
+            <div className="w-full md:w-2/3 bg-app-card border border-app-border rounded-lg flex flex-col overflow-hidden relative">
                 {!selectedNoteId ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-600">
+                <div className="flex-1 flex flex-col items-center justify-center text-app-subtext">
                     <FileText size={48} className="mb-4 opacity-20" />
                     <p className="text-sm uppercase tracking-widest">Selecione ou crie um registro</p>
                 </div>
                 ) : (
                 <>
                     {/* Editor Toolbar */}
-                    <div className="p-4 border-b border-gray-800 flex flex-wrap gap-4 items-center bg-[#0f151b]">
+                    <div className="p-4 border-b border-app-border flex flex-wrap gap-4 items-center bg-app-input">
                     <div className="flex-1 min-w-[200px]">
                         <input 
                         type="text" 
@@ -231,7 +231,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         onChange={e => setEditTitle(e.target.value)}
                         onBlur={handleBlur}
                         placeholder="Título do Registro"
-                        className="w-full bg-transparent text-lg font-bold text-white placeholder-gray-600 outline-none"
+                        className="w-full bg-transparent text-lg font-bold text-app-text placeholder-app-subtext outline-none"
                         />
                     </div>
                     
@@ -239,7 +239,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         <select 
                             value={editCategory}
                             onChange={e => { setEditCategory(e.target.value as Category); handleBlur(); }}
-                            className="bg-black border border-gray-700 text-xs text-gray-300 rounded px-2 py-2 outline-none focus:border-app-gold"
+                            className="bg-app-card border border-app-border text-xs text-app-subtext rounded px-2 py-2 outline-none focus:border-app-gold"
                         >
                             {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -247,7 +247,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         <select 
                             value={editGoalId}
                             onChange={e => { setEditGoalId(e.target.value); handleBlur(); }}
-                            className="bg-black border border-gray-700 text-xs text-gray-300 rounded px-2 py-2 outline-none focus:border-app-gold max-w-[150px]"
+                            className="bg-app-card border border-app-border text-xs text-app-subtext rounded px-2 py-2 outline-none focus:border-app-gold max-w-[150px]"
                         >
                             <option value="">-- Sem Meta --</option>
                             {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
@@ -271,10 +271,10 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     onChange={e => setEditContent(e.target.value)}
                     onBlur={handleBlur}
                     placeholder="Registre decisões, aprendizados e fatos. Seja objetivo."
-                    className="flex-1 w-full bg-app-card p-6 text-gray-300 outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-app-red selection:text-white"
+                    className="flex-1 w-full bg-app-card p-6 text-app-text outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-app-red selection:text-white"
                     />
                     
-                    <div className="p-2 border-t border-gray-800 text-[10px] text-gray-600 flex justify-end px-4">
+                    <div className="p-2 border-t border-app-border text-[10px] text-app-subtext flex justify-end px-4">
                     {selectedNoteId !== 'NEW' ? 'Auto-save ativo' : 'Preencha o título para salvar'}
                     </div>
                 </>

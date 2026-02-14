@@ -153,6 +153,7 @@ export interface AppState {
   settings: {
     silentMode: boolean;
     validDayThreshold: number;
+    theme: 'dark' | 'light'; // Adicionado
   };
   timer?: ExecutionTimer;
   evolution?: EvolutionState;

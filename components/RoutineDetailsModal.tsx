@@ -21,8 +21,6 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
       const val = e.target.value;
-      // Note: input type="time" normally restricts values to valid times (00:00 - 23:59).
-      // We pass the value directly as modern browsers enforce the limit.
       setter(val);
   };
 
@@ -62,7 +60,6 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
   };
 
   const updateTaskTime = (taskId: string, newTime: string) => {
-    // Browser input[type=time] enforces 00-59 minutes.
     const updatedTasks = tasks.map(t => 
       t.id === taskId ? { ...t, time: newTime } : t
     );
@@ -78,15 +75,15 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-2 md:p-4">
-      <div className="w-full max-w-4xl bg-app-card border border-gray-700 rounded-lg shadow-2xl flex flex-col max-h-[95vh] md:max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 md:p-4">
+      <div className="w-full max-w-4xl bg-app-card border border-app-border rounded-lg shadow-2xl flex flex-col max-h-[95vh] md:max-h-[90vh]">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-800 shrink-0 bg-app-card z-10 rounded-t-lg">
+        <div className="flex justify-between items-center p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 rounded-t-lg">
           <div className="min-w-0 pr-2">
-            <h2 className="text-lg md:text-2xl font-bold text-white uppercase tracking-wider truncate">{routine.title}</h2>
+            <h2 className="text-lg md:text-2xl font-bold text-app-text uppercase tracking-wider truncate">{routine.title}</h2>
             <p className="text-app-subtext text-xs md:text-sm truncate">Microtarefas e Execução Detalhada</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1">
+          <button onClick={onClose} className="text-app-subtext hover:text-app-text transition-colors p-1">
             <X size={24} />
           </button>
         </div>
@@ -101,14 +98,14 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
               return (
                 <div 
                   key={block} 
-                  className={`flex flex-col bg-[#0A0A0A] border rounded-lg transition-all duration-300 overflow-hidden ${isSelected ? 'border-app-subtext shadow-lg ring-1 ring-gray-700' : 'border-gray-800 opacity-90 md:opacity-80 hover:opacity-100'}`}
+                  className={`flex flex-col bg-app-input border rounded-lg transition-all duration-300 overflow-hidden ${isSelected ? 'border-app-subtext shadow-lg ring-1 ring-app-border' : 'border-app-border opacity-90 md:opacity-80 hover:opacity-100'}`}
                   onClick={() => setActiveBlock(block)}
                 >
                   {/* Block Header */}
-                  <div className="p-3 border-b border-gray-800 flex items-center gap-3 bg-white/5 shrink-0">
+                  <div className="p-3 border-b border-app-border flex items-center gap-3 bg-app-card/30 shrink-0">
                     {getBlockIcon(block)}
-                    <h3 className="font-bold text-xs md:text-sm uppercase text-gray-300">{block}</h3>
-                    <span className="ml-auto text-xs bg-black px-2 py-0.5 rounded text-gray-500">
+                    <h3 className="font-bold text-xs md:text-sm uppercase text-app-text">{block}</h3>
+                    <span className="ml-auto text-xs bg-app-card border border-app-border px-2 py-0.5 rounded text-app-subtext">
                       {blockTasks.length}
                     </span>
                   </div>
@@ -116,21 +113,21 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                   {/* Tasks List */}
                   <div className={`flex-1 p-2 space-y-2 ${isSelected ? 'min-h-[100px]' : 'min-h-[60px]'} md:overflow-y-auto md:max-h-[300px] md:scrollbar-thin`}>
                     {blockTasks.length === 0 && (
-                      <div className="flex flex-col items-center justify-center text-gray-700 text-xs italic py-4">
+                      <div className="flex flex-col items-center justify-center text-app-subtext text-xs italic py-4">
                         Sem tarefas
                       </div>
                     )}
                     {blockTasks.map(task => (
-                      <div key={task.id} className="group bg-app-card border border-gray-800 p-2 rounded flex items-center gap-2 hover:border-gray-600 transition-colors">
+                      <div key={task.id} className="group bg-app-card border border-app-border p-2 rounded flex items-center gap-2 hover:border-app-subtext transition-colors">
                         <button 
                           onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
-                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-gray-600 hover:border-gray-400'}`}
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}
                         >
                           {task.isCompleted && <Check size={12} className="text-black font-bold"/>}
                         </button>
                         
                         <div className="flex-1 min-w-0">
-                          <p className={`text-xs md:text-sm truncate ${task.isCompleted ? 'text-gray-600 line-through' : 'text-gray-300'}`}>
+                          <p className={`text-xs md:text-sm truncate ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>
                             {task.title}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
@@ -140,14 +137,14 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                                 value={task.time}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => updateTaskTime(task.id, e.target.value)}
-                                className="bg-transparent text-xs text-gray-500 w-24 outline-none hover:text-white focus:text-app-gold p-0 cursor-pointer"
+                                className="bg-transparent text-xs text-app-subtext w-24 outline-none hover:text-app-text focus:text-app-gold p-0 cursor-pointer"
                              />
                           </div>
                         </div>
 
                         <button 
                           onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                          className="text-gray-500 hover:text-app-red transition-colors p-2 md:p-1"
+                          className="text-app-subtext hover:text-app-red transition-colors p-2 md:p-1"
                           title="Excluir"
                         >
                           <Trash2 size={16} />
@@ -157,12 +154,12 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                   </div>
 
                   {/* Add Input */}
-                  <div className={`p-2 border-t border-gray-800 shrink-0 ${isSelected ? 'bg-app-card/50' : ''}`}>
+                  <div className={`p-2 border-t border-app-border shrink-0 ${isSelected ? 'bg-app-card/50' : ''}`}>
                     <form onSubmit={handleAddTask} className="flex gap-2 items-center">
                       <input 
                         type="text" 
                         placeholder={isSelected ? "Nova tarefa..." : "Editar"}
-                        className="flex-1 min-w-0 bg-transparent text-xs text-white placeholder-gray-600 outline-none py-2"
+                        className="flex-1 min-w-0 bg-transparent text-xs text-app-text placeholder-app-subtext outline-none py-2"
                         value={isSelected ? newTaskTitle : ''}
                         onChange={e => setNewTaskTitle(e.target.value)}
                         disabled={!isSelected}
@@ -174,7 +171,7 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                                 type="time" 
                                 value={newTaskTime}
                                 onChange={e => handleTimeChange(e, setNewTaskTime)}
-                                className="bg-black text-[10px] text-gray-400 rounded px-1 border border-gray-800 outline-none w-16 h-7 text-center"
+                                className="bg-app-card text-[10px] text-app-subtext rounded px-1 border border-app-border outline-none w-16 h-7 text-center"
                             />
                             <button type="submit" className="bg-app-gold/10 hover:bg-app-gold text-app-gold hover:text-black p-1.5 rounded transition-colors">
                                 <Plus size={16} />

@@ -9,7 +9,7 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   documents: [],
   dayLogs: {},
   lastCheckIn: null,
-  settings: { silentMode: false, validDayThreshold: 0.7 },
+  settings: { silentMode: false, validDayThreshold: 0.7, theme: 'dark' },
   timer: {
     status: 'IDLE',
     durationSeconds: 0,
@@ -76,6 +76,11 @@ export const authService = {
 
     // Se não tiver dados salvos, cria estado inicial
     const appStateData = dbData?.data || createInitialState();
+    
+    // Migração de dados legados (garantir que theme exista)
+    if (appStateData.settings && !appStateData.settings.theme) {
+        appStateData.settings.theme = 'dark';
+    }
 
     return { ...appStateData, user };
   },

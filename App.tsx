@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -24,7 +25,11 @@ import {
   X,
   Mic,
   Sun,
-  Moon
+  Moon,
+  Camera,
+  Eye,
+  EyeOff,
+  ChevronDown
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState } from './types';
 import { authService, dataService } from './services/storage';
@@ -173,6 +178,124 @@ const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light', onToggle: (
     );
 };
 
+// --- User Profile Sidebar Component (Expandable) ---
+const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvatar: (url: string) => void }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                onUpdateAvatar(base64);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    return (
+        <div className="border-b border-app-border bg-app-input/30 transition-all duration-300">
+            {/* Header (Always Visible) - Click to toggle */}
+            <div 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-4 flex items-center gap-3 cursor-pointer hover:bg-app-hover/50 transition-colors group select-none"
+            >
+                {/* Small Avatar Preview */}
+                <div className="w-10 h-10 rounded-full border border-app-gold/50 overflow-hidden shrink-0 shadow-sm group-hover:border-app-gold transition-colors">
+                    {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-sm">
+                            {user.username.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                </div>
+                
+                {/* User Info & Toggle Icon */}
+                <div className="min-w-0 flex-1 flex items-center justify-between">
+                    <div className="overflow-hidden">
+                        <h3 className="font-bold text-app-text truncate text-sm group-hover:text-app-gold transition-colors">{user.username}</h3>
+                        <p className="text-[10px] text-app-subtext truncate font-medium">
+                            {isExpanded ? 'Fechar detalhes' : 'Ver perfil'}
+                        </p>
+                    </div>
+                    <ChevronDown 
+                        size={16} 
+                        className={`text-app-subtext transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`} 
+                    />
+                </div>
+            </div>
+
+            {/* Expanded Details Area */}
+            {isExpanded && (
+                <div className="px-4 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300 border-t border-app-border/30 pt-4 bg-app-bg/30">
+                    
+                    {/* Avatar Upload Area (Large) */}
+                    <div className="flex flex-col items-center justify-center gap-2">
+                        <div 
+                            className="relative w-24 h-24 rounded-full border-2 border-app-gold overflow-hidden cursor-pointer group shadow-xl"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt="Avatar Large" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            ) : (
+                                <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-3xl">
+                                    {user.username.charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                            
+                            {/* Overlay on Hover */}
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <Camera size={24} className="text-white mb-1" />
+                                <span className="text-[9px] text-white font-bold uppercase tracking-widest">Alterar</span>
+                            </div>
+                        </div>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                        />
+                    </div>
+
+                    {/* Email Field */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1">
+                            <Mail size={10} /> Email
+                        </label>
+                        <div className="w-full bg-app-bg border border-app-border rounded p-2 text-xs text-app-text break-all font-medium">
+                            {user.email}
+                        </div>
+                    </div>
+
+                    {/* Password Field */}
+                    <div className="space-y-1">
+                         <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1">
+                            <Shield size={10} /> Senha
+                         </label>
+                        <div className="flex items-center justify-between bg-app-bg border border-app-border rounded p-2">
+                            <span className="text-xs text-app-text font-mono truncate mr-2 select-all">
+                                {showPassword ? (user.password || '******') : '••••••••'}
+                            </span>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }}
+                                className="text-app-subtext hover:text-app-gold transition-colors p-1"
+                                title={showPassword ? "Ocultar" : "Mostrar"}
+                            >
+                                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- Main App Logic ---
 
 function App() {
@@ -234,6 +357,19 @@ function App() {
               settings: {
                   ...prev.settings,
                   theme: newTheme
+              }
+          };
+      });
+  };
+
+  const handleUpdateAvatar = (newUrl: string) => {
+      setAppState(prev => {
+          if(!prev || !prev.user) return null;
+          return {
+              ...prev,
+              user: {
+                  ...prev.user,
+                  avatarUrl: newUrl
               }
           };
       });
@@ -763,10 +899,11 @@ function App() {
 
       {/* Sidebar - Desktop Only */}
       <aside className="hidden md:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 bg-app-red rounded-sm flex items-center justify-center font-bold text-white">C</div>
-          <span className="font-bold text-lg tracking-tighter text-app-text">CÓDIGO</span>
-        </div>
+        
+        {/* User Profile Section (Expandable) */}
+        {appState.user && (
+            <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />
+        )}
 
         <nav className="flex-1 px-4 space-y-2 mt-8">
           {NAV_ITEMS.map((item) => {

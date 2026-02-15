@@ -8,6 +8,7 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   routines: [],
   notes: [],
   documents: [],
+  pdfs: [], // Inicializa array de arquivos
   dayLogs: {},
   lastCheckIn: null,
   settings: { silentMode: false, validDayThreshold: 0.7, theme: 'dark' },
@@ -75,6 +76,11 @@ export const authService = {
         appStateData.settings.theme = 'dark';
     }
     
+    // Migração de dados legados (garantir que pdfs exista)
+    if (!appStateData.pdfs) {
+        appStateData.pdfs = [];
+    }
+    
     // Montar o objeto User local
     // NOTA: 'password' é injetado aqui apenas para cumprir o requisito visual da UI. 
     // O Supabase NÃO retorna a senha. Estamos usando a senha digitada no formulário de login.
@@ -138,7 +144,7 @@ export const authService = {
             .from('app_data')
             .insert({
                 user_id: authData.user.id,
-                data: { ...initialState, user: { avatarUrl: '' } } // Salva estrutura básica
+                data: { ...initialState, user: { avatarUrl: '', username: username } } 
             });
 
         if (dbError) {
@@ -156,19 +162,20 @@ export const dataService = {
   saveState: async (userId: string, state: AppState) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-        console.warn("Tentativa de salvar sem sessão ativa. Ignorando.");
+        // console.warn("Tentativa de salvar sem sessão ativa. Ignorando.");
         return;
     }
 
     const { user, ...dataToSave } = state;
     
-    // Precisamos salvar o user.avatarUrl dentro do blob de dados ou gerenciar separadamente.
-    // Para simplificar e manter compatibilidade, vamos salvar um "user metadata" dentro do JSON dataToSave
-    // ou assumir que o 'user' no AppState é reconstruído no login, mas o avatarUrl precisa persistir.
-    // Vamos salvar user.avatarUrl dentro do JSON principal para persistência.
+    // CORREÇÃO: Salvamos username e avatarUrl dentro do JSON
+    // Isso permite que a função 'search_users' do banco encontre o usuário pelo nome
     const payload = {
         ...dataToSave,
-        user: { avatarUrl: user?.avatarUrl } // Persiste apenas campos não sensíveis/customizados
+        user: { 
+            avatarUrl: user?.avatarUrl,
+            username: user?.username 
+        } 
     };
 
     const { error } = await supabase

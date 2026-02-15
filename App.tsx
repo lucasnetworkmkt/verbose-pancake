@@ -30,7 +30,8 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
-  User as UserIcon
+  User as UserIcon,
+  DollarSign
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
@@ -44,6 +45,7 @@ import ExecutionTimer from './components/ExecutionTimer';
 import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
+import FinanceManager from './components/FinanceManager';
 
 // --- Subcomponents within App.tsx ---
 
@@ -401,7 +403,7 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION'>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
   const [showMentorModal, setShowMentorModal] = useState(false);
@@ -708,6 +710,7 @@ function App() {
     { id: 'METAS', icon: Target, label: 'Metas' },
     { id: 'ROUTINES', icon: ListTodo, label: 'Rotinas' },
     { id: 'NOTES', icon: FileText, label: 'Anotações' },
+    { id: 'FINANCE', icon: DollarSign, label: 'Finanças' },
     { id: 'HISTORY', icon: CalendarIcon, label: 'Hist' }, 
     { id: 'TIMER', icon: Timer, label: 'Timer' }, 
   ];
@@ -734,7 +737,7 @@ function App() {
              return (
               <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full flex items-center gap-4 p-3 rounded transition-all duration-200 relative ${isActive ? 'bg-app-nav-active text-app-red border-l-2 border-app-red shadow-sm' : 'text-app-subtext hover:text-app-text hover:bg-app-hover'}`}>
                 <item.icon size={20} className={showPulse ? 'text-app-gold' : ''} />
-                <span className={`font-medium text-sm uppercase ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Hist' ? 'Histórico' : (item.label === 'Timer' ? 'Cronômetro' : item.label)}</span>
+                <span className={`font-medium text-sm uppercase ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Hist' ? 'Histórico' : (item.label === 'Timer' ? 'Cronômetro' : (item.label === 'Finanças' ? 'Finanças' : item.label))}</span>
                 {showPulse && <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-app-gold animate-pulse"></span>}
               </button>
             )
@@ -1024,6 +1027,9 @@ function App() {
           {/* NOTES TAB */}
           {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
 
+          {/* FINANCE TAB */}
+          {activeTab === 'FINANCE' && appState.user && <div className="h-full"><FinanceManager user={appState.user} /></div>}
+
           {/* TIMER TAB */}
           {activeTab === 'TIMER' && <div className="flex flex-col items-center justify-center h-full"><ExecutionTimer timerState={currentTimerState} onUpdateTimer={handleUpdateTimer} /></div>}
 
@@ -1039,7 +1045,7 @@ function App() {
            return (
             <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex flex-col items-center justify-center flex-1 gap-1 transition-all relative ${isActive ? 'text-app-gold bg-app-nav-active border-t-2 border-app-gold' : 'text-app-subtext hover:text-app-text border-t-2 border-transparent'}`}>
               <item.icon size={18} className={showPulse ? 'text-app-gold' : ''} />
-              <span className={`text-[9px] uppercase font-bold tracking-wider ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Histórico' ? 'Hist' : (item.label === 'Evolução' ? 'Evo' : item.label)}</span>
+              <span className={`text-[9px] uppercase font-bold tracking-wider ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Hist' ? 'Histórico' : (item.label === 'Timer' ? 'Cronômetro' : (item.label === 'Finanças' ? 'Fin' : (item.label === 'Evolução' ? 'Evo' : item.label)))}</span>
               {showPulse && <span className="absolute top-2 right-4 w-1.5 h-1.5 rounded-full bg-app-gold animate-pulse"></span>}
             </button>
           )

@@ -31,7 +31,8 @@ import {
   EyeOff,
   ChevronDown,
   User as UserIcon,
-  DollarSign
+  DollarSign,
+  Grid
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
@@ -409,6 +410,7 @@ function App() {
   const [showMentorModal, setShowMentorModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -726,6 +728,40 @@ function App() {
       <MentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
 
+      {/* MOBILE NAV OVERLAY */}
+      {isMobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col justify-end animate-in fade-in slide-in-from-bottom-10 duration-200">
+             {/* Header to close */}
+             <div className="absolute top-0 left-0 right-0 p-4 flex justify-end">
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-app-card rounded-full text-app-subtext hover:text-white border border-app-border">
+                    <X size={24} />
+                </button>
+             </div>
+             
+             <div className="p-6 pb-24 grid grid-cols-3 gap-4">
+                 {NAV_ITEMS.map((item) => (
+                     <button
+                        key={item.id}
+                        onClick={() => {
+                            setActiveTab(item.id as any);
+                            setIsMobileMenuOpen(false);
+                        }}
+                        className={`
+                            flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all active:scale-95
+                            ${activeTab === item.id 
+                                ? 'bg-app-card border-app-gold text-app-gold shadow-lg' 
+                                : 'bg-app-input border-app-border text-app-subtext hover:border-app-subtext hover:text-white'
+                            }
+                        `}
+                     >
+                        <item.icon size={28} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">{item.label === 'Hist' ? 'Histórico' : item.label}</span>
+                     </button>
+                 ))}
+             </div>
+          </div>
+      )}
+
       {/* Sidebar - Desktop Only */}
       <aside className="hidden md:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
         {appState.user && <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />}
@@ -1036,20 +1072,41 @@ function App() {
         </div>
       </main>
 
-      {/* Bottom Navigation - Mobile Only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-stretch z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
-        {NAV_ITEMS.map((item) => {
-           const isActive = activeTab === item.id;
-           const isTimerLink = item.id === 'TIMER';
-           const showPulse = isTimerLink && isTimerRunning && !isActive;
-           return (
-            <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex flex-col items-center justify-center flex-1 gap-1 transition-all relative ${isActive ? 'text-app-gold bg-app-nav-active border-t-2 border-app-gold' : 'text-app-subtext hover:text-app-text border-t-2 border-transparent'}`}>
-              <item.icon size={18} className={showPulse ? 'text-app-gold' : ''} />
-              <span className={`text-[9px] uppercase font-bold tracking-wider ${showPulse ? 'text-app-gold' : ''}`}>{item.label === 'Hist' ? 'Histórico' : (item.label === 'Timer' ? 'Cronômetro' : (item.label === 'Finanças' ? 'Fin' : (item.label === 'Evolução' ? 'Evo' : item.label)))}</span>
-              {showPulse && <span className="absolute top-2 right-4 w-1.5 h-1.5 rounded-full bg-app-gold animate-pulse"></span>}
-            </button>
-          )
-        })}
+      {/* Bottom Navigation - Mobile Only - UPDATED TO 3-BAR MENU STYLE */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-center z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
+        
+        {/* Left: Quick Home */}
+        <button 
+            onClick={() => { setActiveTab('DASHBOARD'); setIsMobileMenuOpen(false); }} 
+            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'DASHBOARD' ? 'text-app-gold' : 'text-app-subtext'}`}
+        >
+            <LayoutDashboard size={20} />
+            <span className="text-[9px] font-bold uppercase mt-1">Início</span>
+        </button>
+
+        {/* Center: The Requested MENU Trigger (3 Lines) */}
+        <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="flex flex-col items-center justify-center w-20 h-full -mt-6"
+        >
+            <div className="bg-app-gold text-black p-4 rounded-full shadow-lg shadow-yellow-500/20 border-4 border-app-bg transform transition-transform active:scale-95">
+                <Menu size={24} strokeWidth={3} />
+            </div>
+            <span className="text-[10px] font-bold uppercase mt-1 text-app-gold">Menu</span>
+        </button>
+
+        {/* Right: Quick Timer (Focus) */}
+        <button 
+            onClick={() => { setActiveTab('TIMER'); setIsMobileMenuOpen(false); }} 
+            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'TIMER' ? 'text-app-gold' : 'text-app-subtext'}`}
+        >
+            <div className="relative">
+                <Timer size={20} />
+                {isTimerRunning && <span className="absolute -top-1 -right-1 w-2 h-2 bg-app-red rounded-full animate-pulse"></span>}
+            </div>
+            <span className="text-[9px] font-bold uppercase mt-1">Foco</span>
+        </button>
+
       </nav>
     </div>
   );

@@ -52,15 +52,34 @@ import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
 
+// --- CONSTANTS ---
+const NAV_ITEMS = [
+  { id: 'DASHBOARD', label: 'Início', icon: LayoutDashboard },
+  { id: 'EVOLUTION', label: 'Evolução', icon: MapPin },
+  { id: 'METAS', label: 'Metas', icon: Target },
+  { id: 'ROUTINES', label: 'Rotinas', icon: ListTodo },
+  { id: 'HISTORY', label: 'Hist', icon: CalendarIcon },
+  { id: 'TIMER', label: 'Timer', icon: Timer },
+  { id: 'NOTES', label: 'Anotações', icon: FileText },
+  { id: 'FINANCE', label: 'Finanças', icon: DollarSign },
+];
+
 // --- Loading Screen Component Enhanced ---
 const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
   const [showCancel, setShowCancel] = useState(false);
 
   useEffect(() => {
-    // Timeout de segurança: Se demorar mais de 3 segundos, permite sair.
-    const timer = setTimeout(() => setShowCancel(true), 3000);
+    // Timeout de segurança mais rápido: 2.5 segundos
+    const timer = setTimeout(() => setShowCancel(true), 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleHardReset = () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      if(onCancel) onCancel();
+      window.location.reload();
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text animate-in fade-in duration-500 relative z-50">
@@ -73,14 +92,14 @@ const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
         <h2 className="text-xl font-bold uppercase tracking-widest animate-pulse text-app-gold">Carregando Sistema</h2>
         <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
 
-        {showCancel && onCancel && (
-            <div className="mt-8 flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5 fade-in">
-                <p className="text-app-red text-[10px] uppercase font-bold">Está demorando mais que o normal?</p>
+        {showCancel && (
+            <div className="mt-8 flex flex-col items-center gap-3 animate-in slide-in-from-bottom-5 fade-in">
+                <p className="text-app-subtext text-[10px] uppercase font-bold">Demorando? Você pode reiniciar a sessão.</p>
                 <button 
-                    onClick={onCancel}
+                    onClick={handleHardReset}
                     className="flex items-center gap-2 text-white bg-app-red hover:bg-red-700 px-6 py-3 rounded transition-colors text-xs uppercase font-bold tracking-wider shadow-lg"
                 >
-                    <LogOut size={14} /> Forçar Logout / Cancelar
+                    <LogOut size={14} /> Resetar / Sair
                 </button>
             </div>
         )}
@@ -102,7 +121,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
     e.preventDefault();
     setError('');
 
-    // --- VALIDAÇÕES LOCAIS ---
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         setError("Formato de email inválido.\nCertifique-se de usar algo como 'exemplo@gmail.com'.");
@@ -118,7 +136,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
         setError("O nome de usuário deve ter pelo menos 3 caracteres.");
         return;
     }
-    // -------------------------
 
     setLoading(true);
     try {
@@ -145,7 +162,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
+    <div className="min-h-screen flex items-center justify-center bg-app-bg p-4 animate-in fade-in zoom-in duration-300">
       <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border shadow-2xl">
         <h1 className="text-3xl font-bold text-center text-app-text mb-2">CÓDIGO DA EXECUÇÃO</h1>
         <p className="text-center text-app-subtext mb-8 text-sm">Sistema de Controle & Disciplina</p>
@@ -156,29 +173,16 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
             </div>
         )}
 
-        {/* Google Login Button */}
         <button 
             type="button"
             onClick={handleGoogleLogin}
             className="w-full bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 mb-6 uppercase tracking-wider transition-colors flex items-center justify-center gap-3 rounded shadow-sm"
         >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    fill="#4285F4"
-                />
-                <path
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    fill="#34A853"
-                />
-                <path
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    fill="#FBBC05"
-                />
-                <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    fill="#EA4335"
-                />
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             Entrar com Google
         </button>
@@ -193,50 +197,25 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
           {isRegister && (
             <div>
               <label className="block text-xs text-app-subtext mb-1 uppercase">Nome de Usuário</label>
-              <input 
-                type="text" 
-                required 
-                className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-              />
+              <input type="text" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={username} onChange={e => setUsername(e.target.value)} />
             </div>
           )}
           <div>
             <label className="block text-xs text-app-subtext mb-1 uppercase">Email</label>
-            <input 
-              type="email" 
-              required 
-              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
+            <input type="email" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={email} onChange={e => setEmail(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs text-app-subtext mb-1 uppercase">Senha</label>
-            <input 
-              type="password" 
-              required 
-              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
+            <input type="password" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={password} onChange={e => setPassword(e.target.value)} />
           </div>
           
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-app-red hover:bg-red-700 text-white font-bold py-3 uppercase tracking-wider transition-colors disabled:opacity-50 mt-6"
-          >
+          <button type="submit" disabled={loading} className="w-full bg-app-red hover:bg-red-700 text-white font-bold py-3 uppercase tracking-wider transition-colors disabled:opacity-50 mt-6">
             {loading ? 'Conectando...' : (isRegister ? 'Criar Conta' : 'Acessar Sistema')}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <button 
-            onClick={() => { setIsRegister(!isRegister); setError(''); }}
-            className="text-app-subtext hover:text-app-text text-sm underline"
-          >
+          <button onClick={() => { setIsRegister(!isRegister); setError(''); }} className="text-app-subtext hover:text-app-text text-sm underline">
             {isRegister ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastrar'}
           </button>
         </div>
@@ -245,7 +224,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   );
 };
 
-// --- Missing Components Definitions ---
+// --- Main App Logic ---
 
 const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) => (
   <button
@@ -321,11 +300,8 @@ const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, o
     );
 };
 
-// --- Main App Logic ---
-
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
-  // ... (outros states inalterados)
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
@@ -336,25 +312,29 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
+  // --- LOGOUT ROBUSTO ---
   const handleLogout = async () => {
-    // 1. Force clear supabase session
+    // 1. Tenta logout no Supabase
     try {
         await supabase.auth.signOut();
     } catch (e) { 
         console.error("Logout error (ignored):", e); 
     }
     
-    // 2. Clear local storage explicitly if needed
+    // 2. Limpa armazenamento local
     localStorage.clear();
+    sessionStorage.clear();
 
-    // 3. Reset React State
+    // 3. Reseta estado React
     setAppState(null);
     setLoadingError(null);
     setIsLoading(false); 
-    // This effectively returns user to AuthScreen
+    
+    // 4. Reload forçado para garantir limpeza de memória e estado
+    window.location.reload();
   };
 
-  // --- ROBUST INITIALIZATION ---
+  // --- INICIALIZAÇÃO ROBUSTA ---
   useEffect(() => {
     let mounted = true;
 
@@ -363,53 +343,52 @@ function App() {
         setLoadingError(null);
 
         try {
-            // 1. Get Session with a hard timeout of 5s for the initial check
-            // We race the getSession promise against a timeout
+            // Check Session
             const sessionPromise = supabase.auth.getSession();
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout ao conectar com Supabase")), 5000));
+            // Timeout de 5s para evitar tela branca eterna
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Supabase")), 5000));
             
             const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
             if (mounted) {
                 if (data.session?.user) {
-                    console.log("Sessão encontrada. Carregando dados...");
-                    // User found, load data
+                    console.log("Sessão recuperada:", data.session.user.id);
                     try {
                         const state = await authService.loadUserSession(data.session.user);
                         if (mounted) {
                             setAppState(state);
                             setIsLoading(false);
+                            // Notifica o usuário que a sessão foi restaurada (Auto-Login)
+                            setToast("Sessão restaurada com sucesso.");
+                            setTimeout(() => setToast(null), 3000);
                         }
                     } catch (loadErr: any) {
-                         console.error("Erro fatal no carregamento de dados:", loadErr);
+                         console.error("Erro ao carregar dados:", loadErr);
                          if (mounted) {
-                             setLoadingError(loadErr.message || "Erro ao carregar dados do usuário.");
+                             setLoadingError(loadErr.message || "Falha ao carregar perfil.");
                              setIsLoading(false);
                          }
                     }
                 } else {
-                    console.log("Nenhuma sessão ativa. Exibindo login.");
-                    // No user, stop loading immediately
+                    console.log("Sem sessão ativa.");
                     setIsLoading(false);
                 }
             }
         } catch (err: any) {
-            console.error("Erro na inicialização:", err);
+            console.error("Init error:", err);
             if (mounted) {
-                // If it was a timeout or connection error, we stop loading and show login or error
-                // If we treat it as no session, user can try to login again
-                setIsLoading(false); 
+                setIsLoading(false); // Libera para AuthScreen em caso de erro de conexão/timeout
             }
         }
     };
 
     initializeApp();
 
-    // 2. Listen for auth changes (Login/Logout events)
+    // Auth Listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth State Changed:", event);
+        console.log("Auth Event:", event);
         if (event === 'SIGNED_IN' && session?.user) {
-            // Only load if we aren't already loaded/loading to avoid loops
+            // Carrega apenas se ainda não estiver carregado/carregando
             if (!appState && !isLoading) {
                  setIsLoading(true);
                  try {
@@ -439,7 +418,7 @@ function App() {
     };
   }, []); 
 
-  // ... (Resto do componente App inalterado)
+  // ... (Efeitos e handlers existentes mantidos)
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -654,7 +633,7 @@ function App() {
       setAppState(prev => prev ? ({ ...prev, timer: newTimerState }) : null);
   };
 
-  // Evolution Handlers (Level 1, 2, 3)...
+  // ... (Evolution & Note Handlers mantidos)
   const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution!, startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado. Relógio rodando."); };
   const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution, completedDays: [...currentCompleted, day] } }; } return prev; }); };
   const handleUndoEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; return { ...prev, evolution: { ...prev.evolution, completedDays: currentCompleted.filter(d => d !== day) } }; }); };
@@ -664,7 +643,6 @@ function App() {
   const handleStartLevel3 = () => { setAppState(prev => { if(!prev || !prev.evolution) return null; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...prev.evolution, level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
   const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...prev.evolution, level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
 
-  // Note, Doc, PDF Handlers...
   const handleAddNote = (note: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; return { ...prev, notes: [note, ...currentNotes] }; }); };
   const handleUpdateNote = (updatedNote: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.map(n => n.id === updatedNote.id ? updatedNote : n); return { ...prev, notes: updatedNotes }; }); };
   const handleDeleteNote = (id: string) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.filter(n => n.id !== id); return { ...prev, notes: updatedNotes }; }); showToast("Anotação excluída."); };
@@ -677,18 +655,17 @@ function App() {
 
   // --- Render ---
 
-  // LOADING & ERROR STATE
   if (isLoading || loadingError) {
       if (loadingError) {
           return (
-             <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text p-8 text-center">
+             <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text p-8 text-center animate-in fade-in zoom-in duration-300">
                 <AlertOctagon size={48} className="text-app-red mb-4" />
                 <h2 className="text-xl font-bold uppercase mb-2">Erro ao Iniciar</h2>
                 <p className="text-app-subtext mb-6">{loadingError}</p>
                 
                 {loadingError.includes("permissão") && (
                    <div className="bg-app-card p-4 rounded border border-app-gold mb-6 text-left text-xs text-app-subtext">
-                       <strong>Atenção:</strong> Isso geralmente acontece porque o banco de dados tem regras de segurança antigas. 
+                       <strong>Atenção:</strong> Erro de segurança no banco de dados.
                        <br/><br/>
                        1. Vá no Supabase &gt; SQL Editor
                        <br/>
@@ -702,7 +679,7 @@ function App() {
                     onClick={handleLogout} 
                     className="bg-app-text text-app-bg px-6 py-3 font-bold uppercase rounded hover:opacity-80 transition-opacity"
                 >
-                    Sair e Tentar Novamente
+                    Reiniciar Sistema
                 </button>
              </div>
           );
@@ -714,10 +691,8 @@ function App() {
     return <AuthScreen onLogin={handleLogin} />;
   }
 
-  // ... (Restante do componente renderizado igual ao anterior)
-  // Como o arquivo App.tsx é grande, mantive a lógica crítica acima e o restante segue o padrão.
-  // O XML abaixo substitui o arquivo inteiro para garantir integridade.
-  
+  // --- RENDER MAIN APP ---
+  // (Mantém o código de renderização do Dashboard, Tabs e Sidebar igual)
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayLog = appState.dayLogs[todayStr];
   const streak = calculateStreak();
@@ -768,21 +743,6 @@ function App() {
 
   const isTimerRunning = currentTimerState.status === 'RUNNING';
 
-  const NAV_ITEMS = [
-    { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Painel' },
-    { id: 'EVOLUTION', icon: MapPin, label: 'Evolução' },
-    { id: 'METAS', icon: Target, label: 'Metas' },
-    { id: 'ROUTINES', icon: ListTodo, label: 'Rotinas' },
-    { id: 'NOTES', icon: FileText, label: 'Anotações' },
-    { id: 'FINANCE', icon: DollarSign, label: 'Finanças' },
-    { id: 'HISTORY', icon: CalendarIcon, label: 'Hist' }, 
-    { id: 'TIMER', icon: Timer, label: 'Timer' }, 
-  ];
-
-  const startOfCurrentMonth = new Date();
-  startOfCurrentMonth.setDate(1);
-  startOfCurrentMonth.setHours(0,0,0,0);
-
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
@@ -793,7 +753,6 @@ function App() {
       {/* MOBILE NAV OVERLAY */}
       {isMobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col justify-end animate-in fade-in slide-in-from-bottom-10 duration-200">
-             {/* Header to close */}
              <div className="absolute top-0 left-0 right-0 p-4 flex justify-end">
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-app-card rounded-full text-app-subtext hover:text-white border border-app-border">
                     <X size={24} />
@@ -824,7 +783,7 @@ function App() {
           </div>
       )}
 
-      {/* Sidebar - Desktop Only (Visible only on LG and up) */}
+      {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
         {appState.user && <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />}
         <nav className="flex-1 px-4 space-y-2 mt-8">
@@ -849,7 +808,6 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* Header - Mobile/Tablet Only (PROFILE & AVATAR) */}
         <div className="lg:hidden">
             {appState.user && (
                 <MobileUserProfileHeader 
@@ -862,10 +820,8 @@ function App() {
             )}
         </div>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-2 lg:p-8 space-y-4 md:space-y-8 scroll-smooth pb-20 lg:pb-8">
           
-          {/* Toast */}
           {toast && (
              <div className="fixed top-6 right-6 bg-app-card border border-app-gold text-app-gold px-4 py-3 md:px-6 md:py-4 rounded shadow-2xl z-50 animate-bounce">
                 <div className="flex items-center gap-2">
@@ -875,10 +831,9 @@ function App() {
              </div>
           )}
 
-          {/* DASHBOARD VIEW */}
           {activeTab === 'DASHBOARD' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-              {/* Left Column: Stats & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 animate-in fade-in duration-300">
+              {/* Left Column */}
               <div className="lg:col-span-2 space-y-4 md:space-y-8">
                 
                 {/* Streak Banner */}
@@ -893,7 +848,7 @@ function App() {
                   <Activity className="text-app-gold opacity-50 w-10 h-10 md:w-12 md:h-12" />
                 </div>
 
-                {/* Day Mode Selector */}
+                {/* Day Mode */}
                 <div className="bg-app-card p-4 md:p-6 rounded border border-app-border shadow-sm">
                   <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-3 md:mb-4 font-bold">Modo do Dia</h3>
                   <div className="grid grid-cols-3 gap-2 md:gap-4">
@@ -909,13 +864,11 @@ function App() {
                   </div>
                 </div>
 
-                {/* Mentor Help Button */}
                 <button onClick={() => setShowMentorModal(true)} className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-3 md:p-4 rounded flex items-center justify-center gap-2 md:gap-3 transition-all group shadow-sm hover:shadow-md">
                   <div className="p-1.5 md:p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors"><Mic size={16} className="md:w-5 md:h-5 text-app-gold group-hover:scale-110 transition-transform" /></div>
                   <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Precisa de ajuda? Fale por voz com o mentor!</span>
                 </button>
 
-                {/* Today's Routines */}
                 <div>
                    <div className="flex items-center justify-between mb-3 md:mb-4">
                        <h3 className="text-base md:text-xl font-bold text-app-text">Rotinas de Hoje</h3>
@@ -961,7 +914,7 @@ function App() {
                         {['D','S','T','Q','Q','S','S'].map((d,i) => <div key={i}>{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1">
-                        {eachDayOfInterval({ start: startOfCurrentMonth, end: endOfMonth(new Date()) }).map(day => {
+                        {eachDayOfInterval({ start: new Date(new Date().getFullYear(), new Date().getMonth(), 1), end: endOfMonth(new Date()) }).map(day => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const log = appState.dayLogs[dStr];
                             let bgClass = 'bg-app-input text-app-subtext';
@@ -973,7 +926,7 @@ function App() {
                     </div>
                  </div>
 
-                 {/* Active Goals Summary */}
+                 {/* Active Goals */}
                  <div className="bg-app-card p-4 md:p-6 rounded border border-app-border shadow-sm">
                     <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-3 md:mb-4 font-bold">Foco Atual</h3>
                     {appState.goals.length === 0 ? <p className="text-app-subtext text-xs italic">Nenhuma meta ativa.</p> : (
@@ -994,24 +947,10 @@ function App() {
             </div>
           )}
           
-          {/* EVOLUTION MAP TAB */}
-          {activeTab === 'EVOLUTION' && (
-             <EvolutionMap 
-                evolutionState={evolutionState}
-                onCompleteDay={handleCompleteEvolutionDay}
-                onUndoDay={handleUndoEvolutionDay}
-                onCompleteDayLevel2={handleCompleteEvolutionDayLevel2}
-                onUndoDayLevel2={handleUndoEvolutionDayLevel2}
-                onStartLevel1={handleStartLevel1}
-                onStartLevel2={handleStartLevel2}
-                onStartLevel3={handleStartLevel3}
-                onCompleteDayLevel3={handleCompleteEvolutionDayLevel3}
-             />
-          )}
-
-          {/* ROUTINES MANAGEMENT */}
+          {/* Outras Tabs (Renderização Condicional Padrão) */}
+          {activeTab === 'EVOLUTION' && <EvolutionMap evolutionState={evolutionState} onCompleteDay={handleCompleteEvolutionDay} onUndoDay={handleUndoEvolutionDay} onCompleteDayLevel2={handleCompleteEvolutionDayLevel2} onUndoDayLevel2={handleUndoEvolutionDayLevel2} onStartLevel1={handleStartLevel1} onStartLevel2={handleStartLevel2} onStartLevel3={handleStartLevel3} onCompleteDayLevel3={handleCompleteEvolutionDayLevel3} />}
           {activeTab === 'ROUTINES' && (
-             <div className="max-w-2xl mx-auto">
+             <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
                  <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Editor de Rotinas</h2>
                  <div className="bg-app-card p-4 md:p-6 rounded mb-6 md:mb-8 border border-app-border shadow-sm">
                      <form onSubmit={(e) => {
@@ -1026,37 +965,19 @@ function App() {
                      }} className="flex flex-col gap-3 md:gap-4">
                          <input name="title" placeholder="Nova rotina..." className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded focus:border-app-red outline-none" required />
                          <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-                             <select name="priority" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 <option value={Priority.HIGH}>Alta (Vermelho)</option>
-                                 <option value={Priority.MODERATE}>Moderada (Dourado)</option>
-                                 <option value={Priority.LOW}>Baixa (Cinza)</option>
-                             </select>
-                             <select name="category" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                             </select>
+                             <select name="priority" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1"><option value={Priority.HIGH}>Alta (Vermelho)</option><option value={Priority.MODERATE}>Moderada (Dourado)</option><option value={Priority.LOW}>Baixa (Cinza)</option></select>
+                             <select name="category" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">{Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}</select>
                          </div>
-                         <div>
-                            <select name="goalId" className="w-full bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none">
-                                <option value="">-- Associar a uma Meta (Opcional) --</option>
-                                {appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                            </select>
-                         </div>
+                         <div><select name="goalId" className="w-full bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none"><option value="">-- Associar a uma Meta (Opcional) --</option>{appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></div>
                          <button className="bg-app-text text-app-bg font-bold uppercase p-3 text-xs md:text-sm hover:opacity-80 transition-colors">Adicionar Rotina</button>
                      </form>
                  </div>
-                 <div className="space-y-2">
-                     <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
-                 </div>
+                 <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
              </div>
           )}
-
-          {/* GOALS TAB */}
           {activeTab === 'METAS' && (
-            <div className="max-w-4xl mx-auto">
-                <div className="flex justify-between items-center mb-4 md:mb-6">
-                    <h2 className="text-lg md:text-2xl font-bold text-app-text">Metas & Objetivos</h2>
-                    <button onClick={() => setShowGoalCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded"><Plus size={16} /> <span className="hidden md:inline">Nova Meta</span><span className="md:hidden">Nova</span></button>
-                </div>
+            <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
+                <div className="flex justify-between items-center mb-4 md:mb-6"><h2 className="text-lg md:text-2xl font-bold text-app-text">Metas & Objetivos</h2><button onClick={() => setShowGoalCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded"><Plus size={16} /> <span className="hidden md:inline">Nova Meta</span><span className="md:hidden">Nova</span></button></div>
                 <div className="grid gap-4 md:gap-8">
                     {appState.goals.map(goal => {
                         const borderColor = getPriorityBorderClass(goal.priority);
@@ -1064,55 +985,19 @@ function App() {
                         return (
                             <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-app-border p-4 md:p-6 rounded shadow-lg relative group`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
-                                    <div className="space-y-1 w-full">
-                                        <div className="flex items-start justify-between md:justify-start gap-3">
-                                            <h3 className="text-lg md:text-2xl font-bold text-app-text break-words leading-tight flex-1">{goal.title}</h3>
-                                            <div className="flex items-center gap-2 shrink-0 mt-1">
-                                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
-                                                <button onClick={(e) => deleteGoal(e, goal.id)} className="p-1 text-app-subtext hover:text-app-red transition-colors" title="Excluir Meta"><Trash2 size={16} /></button>
-                                            </div>
-                                        </div>
-                                        <p className="text-app-subtext text-xs md:text-sm max-w-xl break-words">{goal.description}</p>
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                        <span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span>
-                                        <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline.slice(5)}</span>
-                                    </div>
+                                    <div className="space-y-1 w-full"><div className="flex items-start justify-between md:justify-start gap-3"><h3 className="text-lg md:text-2xl font-bold text-app-text break-words leading-tight flex-1">{goal.title}</h3><div className="flex items-center gap-2 shrink-0 mt-1"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div><button onClick={(e) => deleteGoal(e, goal.id)} className="p-1 text-app-subtext hover:text-app-red transition-colors" title="Excluir Meta"><Trash2 size={16} /></button></div></div><p className="text-app-subtext text-xs md:text-sm max-w-xl break-words">{goal.description}</p></div>
+                                    <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start"><span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span><span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline.slice(5)}</span></div>
                                 </div>
-                                <div className="mb-4 md:mb-6">
-                                    <div className="flex justify-between text-[10px] md:text-xs uppercase text-app-subtext mb-1"><span>Progresso</span><span>{progress}%</span></div>
-                                    <div className="w-full bg-app-input h-1.5 md:h-2 rounded-full border border-app-border"><div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div></div>
-                                </div>
-                                <div className="bg-app-input p-3 md:p-4 rounded border border-app-border">
-                                    <h4 className="text-[10px] md:text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2"><ListTodo size={14}/> Micro Tarefas</h4>
-                                    <div className="space-y-2 mb-4">
-                                        {goal.tasks.length === 0 && <p className="text-app-subtext text-xs italic">Nenhuma micro tarefa definida.</p>}
-                                        {goal.tasks.map(task => (
-                                            <div key={task.id} className="flex items-start gap-2 md:gap-3 group py-1">
-                                                <button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>
-                                                    {task.isCompleted && <Check size={12} className="text-black"/>}
-                                                </button>
-                                                <input type="time" value={task.time} onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)} className="bg-transparent text-[10px] md:text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-14 md:w-16 text-center shrink-0 cursor-pointer mt-0.5" />
-                                                <span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span>
-                                                <button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem('taskTitle') as HTMLInputElement; if(input.value) { addTaskToGoal(goal.id, input.value); input.value = ''; } }} className="flex gap-2 border-t border-app-border pt-3">
-                                        <input name="taskTitle" placeholder="+ Tarefa" className="bg-transparent flex-1 text-xs md:text-sm text-app-text placeholder-app-subtext outline-none min-w-0" />
-                                        <button className="text-[10px] md:text-xs text-app-gold uppercase font-bold hover:text-white shrink-0"><span className="hidden md:inline">Adicionar</span><span className="md:hidden"><Plus size={16}/></span></button>
-                                    </form>
-                                </div>
+                                <div className="mb-4 md:mb-6"><div className="flex justify-between text-[10px] md:text-xs uppercase text-app-subtext mb-1"><span>Progresso</span><span>{progress}%</span></div><div className="w-full bg-app-input h-1.5 md:h-2 rounded-full border border-app-border"><div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div></div></div>
+                                <div className="bg-app-input p-3 md:p-4 rounded border border-app-border"><h4 className="text-[10px] md:text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2"><ListTodo size={14}/> Micro Tarefas</h4><div className="space-y-2 mb-4">{goal.tasks.length === 0 && <p className="text-app-subtext text-xs italic">Nenhuma micro tarefa definida.</p>}{goal.tasks.map(task => (<div key={task.id} className="flex items-start gap-2 md:gap-3 group py-1"><button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>{task.isCompleted && <Check size={12} className="text-black"/>}</button><input type="time" value={task.time} onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)} className="bg-transparent text-[10px] md:text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-14 md:w-16 text-center shrink-0 cursor-pointer mt-0.5" /><span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span><button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button></div>))}</div><form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem('taskTitle') as HTMLInputElement; if(input.value) { addTaskToGoal(goal.id, input.value); input.value = ''; } }} className="flex gap-2 border-t border-app-border pt-3"><input name="taskTitle" placeholder="+ Tarefa" className="bg-transparent flex-1 text-xs md:text-sm text-app-text placeholder-app-subtext outline-none min-w-0" /><button className="text-[10px] md:text-xs text-app-gold uppercase font-bold hover:text-white shrink-0"><span className="hidden md:inline">Adicionar</span><span className="md:hidden"><Plus size={16}/></span></button></form></div>
                             </div>
                         );
                     })}
                 </div>
             </div>
           )}
-
-          {/* HISTORY TAB */}
           {activeTab === 'HISTORY' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
                   <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Histórico de Consistência</h2>
                   <div className="bg-app-card p-4 md:p-6 rounded border border-app-border mb-6 md:mb-8 shadow-sm"><h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3><HistoryChart logs={appState.dayLogs} /></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
@@ -1121,54 +1006,18 @@ function App() {
                   </div>
               </div>
           )}
-
-          {/* NOTES TAB */}
-          {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
-
-          {/* FINANCE TAB */}
-          {activeTab === 'FINANCE' && appState.user && <div className="h-full"><FinanceManager user={appState.user} /></div>}
-
-          {/* TIMER TAB */}
-          {activeTab === 'TIMER' && <div className="flex flex-col items-center justify-center h-full"><ExecutionTimer timerState={currentTimerState} onUpdateTimer={handleUpdateTimer} /></div>}
+          {activeTab === 'NOTES' && <div className="h-full animate-in fade-in duration-300"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
+          {activeTab === 'FINANCE' && appState.user && <div className="h-full animate-in fade-in duration-300"><FinanceManager user={appState.user} /></div>}
+          {activeTab === 'TIMER' && <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-300"><ExecutionTimer timerState={currentTimerState} onUpdateTimer={handleUpdateTimer} /></div>}
 
         </div>
       </main>
 
-      {/* Bottom Navigation - Mobile/Tablet Only (Visible on LG and below) */}
+      {/* Bottom Nav Mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-center z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
-        
-        {/* Left: Quick Home */}
-        <button 
-            onClick={() => { setActiveTab('DASHBOARD'); setIsMobileMenuOpen(false); }} 
-            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'DASHBOARD' ? 'text-app-gold' : 'text-app-subtext'}`}
-        >
-            <LayoutDashboard size={20} />
-            <span className="text-[9px] font-bold uppercase mt-1">Início</span>
-        </button>
-
-        {/* Center: The Requested MENU Trigger (3 Lines) */}
-        <button 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="flex flex-col items-center justify-center w-20 h-full -mt-6"
-        >
-            <div className="bg-app-gold text-black p-4 rounded-full shadow-lg shadow-yellow-500/20 border-4 border-app-bg transform transition-transform active:scale-95">
-                <Menu size={24} strokeWidth={3} />
-            </div>
-            <span className="text-[10px] font-bold uppercase mt-1 text-app-gold">Menu</span>
-        </button>
-
-        {/* Right: Quick Timer (Focus) */}
-        <button 
-            onClick={() => { setActiveTab('TIMER'); setIsMobileMenuOpen(false); }} 
-            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'TIMER' ? 'text-app-gold' : 'text-app-subtext'}`}
-        >
-            <div className="relative">
-                <Timer size={20} />
-                {isTimerRunning && <span className="absolute -top-1 -right-1 w-2 h-2 bg-app-red rounded-full animate-pulse"></span>}
-            </div>
-            <span className="text-[9px] font-bold uppercase mt-1">Foco</span>
-        </button>
-
+        <button onClick={() => { setActiveTab('DASHBOARD'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'DASHBOARD' ? 'text-app-gold' : 'text-app-subtext'}`}><LayoutDashboard size={20} /><span className="text-[9px] font-bold uppercase mt-1">Início</span></button>
+        <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center justify-center w-20 h-full -mt-6"><div className="bg-app-gold text-black p-4 rounded-full shadow-lg shadow-yellow-500/20 border-4 border-app-bg transform transition-transform active:scale-95"><Menu size={24} strokeWidth={3} /></div><span className="text-[10px] font-bold uppercase mt-1 text-app-gold">Menu</span></button>
+        <button onClick={() => { setActiveTab('TIMER'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'TIMER' ? 'text-app-gold' : 'text-app-subtext'}`}><div className="relative"><Timer size={20} />{isTimerRunning && <span className="absolute -top-1 -right-1 w-2 h-2 bg-app-red rounded-full animate-pulse"></span>}</div><span className="text-[9px] font-bold uppercase mt-1">Foco</span></button>
       </nav>
     </div>
   );

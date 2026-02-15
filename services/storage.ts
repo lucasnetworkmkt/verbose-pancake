@@ -52,24 +52,25 @@ export const authService = {
     return data;
   },
 
-  // Carrega os dados do App baseados em uma sessão existente (usado após OAuth ou refresh)
+  // Carrega os dados do App baseados em uma sessão existente
   loadUserSession: async (authUser: any): Promise<AppState> => {
+    console.log("Iniciando carga de dados para:", authUser.id);
+
     // 1. Tenta buscar dados existentes
     let { data: dbData, error: dbError } = await supabase
       .from('app_data')
       .select('data')
       .eq('user_id', authUser.id)
-      .maybeSingle(); // Use maybeSingle para não estourar erro se não existir
+      .maybeSingle(); 
 
     const googleAvatar = authUser.user_metadata?.avatar_url || '';
     const googleName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0];
 
-    // 2. Se não existir dados, CRIA. Se existir, ATUALIZA metadados.
+    // 2. Se NÃO encontrou dados, precisamos descobrir se é um erro de permissão ou se o usuário é realmente novo.
     if (!dbData) {
-        console.log("Usuário novo ou sem dados. Criando estado inicial...");
-        const initialState = createInitialState();
+        console.log("Dados não encontrados via Select. Tentando inicializar...");
         
-        // Payload inicial com dados do Google
+        const initialState = createInitialState();
         const newPayload = { 
             ...initialState, 
             user: { 
@@ -78,54 +79,63 @@ export const authService = {
             } 
         };
 
-        // UPSERT: Tenta inserir, se já existir (conflito de race condition), atualiza.
+        // Tenta INSERIR. 
+        // Se falhar com conflito (23505), significa que os dados EXISTEM, mas o SELECT falhou (erro de permissão).
         const { data: insertedData, error: insertError } = await supabase
             .from('app_data')
-            .upsert({
+            .insert({
                 user_id: authUser.id,
                 data: newPayload,
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' })
+            })
             .select()
             .single();
             
         if (insertError) {
-            console.error("Erro crítico ao criar dados:", insertError);
-            // Se falhar o upsert, tenta ler de novo como último recurso
-            const retry = await supabase.from('app_data').select('data').eq('user_id', authUser.id).single();
-            if (retry.data) dbData = retry.data;
-            else throw new Error("Falha ao criar conta. Tente novamente.");
+            if (insertError.code === '23505') { // Código Postgres para Unique Violation
+                console.warn("Conflito detectado: Usuário JÁ EXISTE no banco. O Select anterior falhou.");
+                console.log("Tentando recuperar dados novamente (Retry)...");
+                
+                // Retry do Select
+                const retry = await supabase.from('app_data').select('data').eq('user_id', authUser.id).single();
+                
+                if (retry.data) {
+                    console.log("Dados recuperados com sucesso no retry.");
+                    dbData = retry.data;
+                } else {
+                    // SE chegar aqui, é certeza que o RLS está bloqueando a leitura
+                    console.error("ERRO CRÍTICO: Dados existem mas não podem ser lidos. Verifique RLS.");
+                    throw new Error("Sua conta existe, mas o sistema não tem permissão para ler seus dados. Por favor, execute o script de correção no Supabase.");
+                }
+            } else {
+                console.error("Erro ao criar nova conta:", insertError);
+                throw new Error("Falha ao criar/acessar conta. Erro: " + insertError.message);
+            }
         } else {
+            console.log("Nova conta criada com sucesso.");
             dbData = insertedData;
         }
     } else {
-        // Se já existe, vamos garantir que o avatar/nome do Google estejam atualizados no JSON
-        // Isso é opcional, mas bom para manter a foto atualizada
+        console.log("Dados encontrados com sucesso.");
+        // Atualiza avatar se necessário
         const currentData = dbData.data as AppState;
-        
-        // Verifica se precisa atualizar info do usuário
         if (currentData.user && (currentData.user.avatarUrl !== googleAvatar && googleAvatar !== '')) {
-             console.log("Atualizando perfil com dados do Google...");
              const updatedPayload = {
                  ...currentData,
                  user: {
                      ...currentData.user,
                      avatarUrl: googleAvatar || currentData.user.avatarUrl,
-                     // Não sobrescrevemos username se ele já alterou manualmente, a menos que esteja vazio
                      username: currentData.user.username || googleName
                  }
              };
-
              await supabase.from('app_data').update({
                  data: updatedPayload,
                  updated_at: new Date().toISOString()
              }).eq('user_id', authUser.id);
-             
              dbData.data = updatedPayload;
         }
     }
 
-    // Garante tipagem e defaults
     let appStateData = dbData?.data || createInitialState();
 
     // Migrações de segurança
@@ -136,14 +146,11 @@ export const authService = {
         appStateData.pdfs = [];
     }
 
-    // Constrói objeto de usuário para a sessão atual
     const user: User = {
         id: authUser.id,
-        // Prioriza o nome salvo no JSON (caso usuário tenha editado), senão usa o do Auth
         username: appStateData.user?.username || googleName || 'Usuário',
         email: authUser.email || '',
         password: '', 
-        // Prioriza avatar salvo, senão Google
         avatarUrl: appStateData.user?.avatarUrl || googleAvatar || '',
         createdAt: new Date(authUser.created_at).getTime()
     };
@@ -158,24 +165,15 @@ export const authService = {
     });
 
     if (authError) {
-      if (authError.message.includes("Invalid login credentials")) {
-        throw new Error("Email ou senha incorretos.");
-      }
-      if (authError.message.includes("Email not confirmed")) {
-        throw new Error("Email não confirmado. Verifique sua caixa de entrada.");
-      }
+      if (authError.message.includes("Invalid login credentials")) throw new Error("Email ou senha incorretos.");
+      if (authError.message.includes("Email not confirmed")) throw new Error("Email não confirmado.");
       throw new Error(authError.message);
     }
 
-    if (!authData.user) {
-      throw new Error("Erro desconhecido ao realizar login.");
-    }
+    if (!authData.user) throw new Error("Erro desconhecido ao realizar login.");
 
     const state = await authService.loadUserSession(authData.user);
-    
-    if (state.user) {
-        state.user.password = password;
-    }
+    if (state.user) state.user.password = password;
 
     return state;
   },
@@ -184,24 +182,17 @@ export const authService = {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { username }
-      }
+      options: { data: { username } }
     });
 
     if (authError) {
-       if (authError.message.includes("User already registered")) {
-         throw new Error("Este email já está cadastrado. Tente fazer login.");
-       }
+       if (authError.message.includes("User already registered")) throw new Error("Email já cadastrado.");
        throw new Error(authError.message);
     }
 
-    if (!authData.user) {
-        throw new Error("Erro ao iniciar registro.");
-    }
+    if (!authData.user) throw new Error("Erro ao iniciar registro.");
 
     const initialState = createInitialState();
-    
     const user: User = {
         id: authData.user.id,
         username: username,
@@ -211,14 +202,13 @@ export const authService = {
         createdAt: Date.now()
     };
 
-    // Tenta salvar imediatamente
     if (authData.session) {
-        await supabase.from('app_data').upsert({
+        await supabase.from('app_data').insert({
             user_id: authData.user.id,
             data: { ...initialState, user: { avatarUrl: '', username: username } } 
         });
     } else {
-        alert("Conta criada! Verifique seu email para confirmar.");
+        alert("Conta criada! Verifique seu email.");
     }
 
     return { user, ...initialState };
@@ -232,7 +222,7 @@ export const dataService = {
 
     const { user, ...dataToSave } = state;
     
-    // Salva user dentro do JSON para persistência de avatar/nome customizados
+    // Salva user dentro do JSON para persistência
     const payload = {
         ...dataToSave,
         user: { 
@@ -241,6 +231,7 @@ export const dataService = {
         } 
     };
 
+    // Upsert aqui é seguro pois estamos salvando o estado ATUAL da memória (que foi carregado corretamente)
     const { error } = await supabase
         .from('app_data')
         .upsert({

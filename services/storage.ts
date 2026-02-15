@@ -8,7 +8,7 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   routines: [],
   notes: [],
   documents: [],
-  pdfs: [], // Inicializa array de arquivos
+  pdfs: [],
   dayLogs: {},
   lastCheckIn: null,
   settings: { silentMode: false, validDayThreshold: 0.7, theme: 'dark' },
@@ -40,7 +40,7 @@ export const authService = {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin, // Redireciona para a URL atual (localhost ou vercel)
+        redirectTo: window.location.origin,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -54,36 +54,81 @@ export const authService = {
 
   // Carrega os dados do App baseados em uma sessão existente (usado após OAuth ou refresh)
   loadUserSession: async (authUser: any): Promise<AppState> => {
-    // 1. Buscar dados do aplicativo no banco
-    const { data: dbData, error: dbError } = await supabase
+    // 1. Tenta buscar dados existentes
+    let { data: dbData, error: dbError } = await supabase
       .from('app_data')
       .select('data')
       .eq('user_id', authUser.id)
-      .single();
+      .maybeSingle(); // Use maybeSingle para não estourar erro se não existir
 
-    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 é "Row not found"
-        console.error("Erro ao buscar dados:", dbError);
-        throw new Error("Falha ao carregar seus dados.");
-    }
+    const googleAvatar = authUser.user_metadata?.avatar_url || '';
+    const googleName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0];
 
-    // Se não tiver dados salvos (primeiro login Google), cria estado inicial
-    let appStateData = dbData?.data || createInitialState();
-    
-    // Se for o primeiro acesso via Google e não tiver dados, salvamos o inicial
+    // 2. Se não existir dados, CRIA. Se existir, ATUALIZA metadados.
     if (!dbData) {
+        console.log("Usuário novo ou sem dados. Criando estado inicial...");
         const initialState = createInitialState();
-        const username = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário';
         
-        // Salva imediatamente para garantir persistência
-        await supabase.from('app_data').insert({
-            user_id: authUser.id,
-            data: { ...initialState, user: { avatarUrl: authUser.user_metadata?.avatar_url || '', username } }
-        });
+        // Payload inicial com dados do Google
+        const newPayload = { 
+            ...initialState, 
+            user: { 
+                avatarUrl: googleAvatar, 
+                username: googleName 
+            } 
+        };
+
+        // UPSERT: Tenta inserir, se já existir (conflito de race condition), atualiza.
+        const { data: insertedData, error: insertError } = await supabase
+            .from('app_data')
+            .upsert({
+                user_id: authUser.id,
+                data: newPayload,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' })
+            .select()
+            .single();
+            
+        if (insertError) {
+            console.error("Erro crítico ao criar dados:", insertError);
+            // Se falhar o upsert, tenta ler de novo como último recurso
+            const retry = await supabase.from('app_data').select('data').eq('user_id', authUser.id).single();
+            if (retry.data) dbData = retry.data;
+            else throw new Error("Falha ao criar conta. Tente novamente.");
+        } else {
+            dbData = insertedData;
+        }
+    } else {
+        // Se já existe, vamos garantir que o avatar/nome do Google estejam atualizados no JSON
+        // Isso é opcional, mas bom para manter a foto atualizada
+        const currentData = dbData.data as AppState;
         
-        appStateData = initialState;
+        // Verifica se precisa atualizar info do usuário
+        if (currentData.user && (currentData.user.avatarUrl !== googleAvatar && googleAvatar !== '')) {
+             console.log("Atualizando perfil com dados do Google...");
+             const updatedPayload = {
+                 ...currentData,
+                 user: {
+                     ...currentData.user,
+                     avatarUrl: googleAvatar || currentData.user.avatarUrl,
+                     // Não sobrescrevemos username se ele já alterou manualmente, a menos que esteja vazio
+                     username: currentData.user.username || googleName
+                 }
+             };
+
+             await supabase.from('app_data').update({
+                 data: updatedPayload,
+                 updated_at: new Date().toISOString()
+             }).eq('user_id', authUser.id);
+             
+             dbData.data = updatedPayload;
+        }
     }
 
-    // Migrações de segurança (dados legados)
+    // Garante tipagem e defaults
+    let appStateData = dbData?.data || createInitialState();
+
+    // Migrações de segurança
     if (appStateData.settings && !appStateData.settings.theme) {
         appStateData.settings.theme = 'dark';
     }
@@ -91,12 +136,15 @@ export const authService = {
         appStateData.pdfs = [];
     }
 
+    // Constrói objeto de usuário para a sessão atual
     const user: User = {
         id: authUser.id,
-        username: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.username || authUser.email?.split('@')[0],
+        // Prioriza o nome salvo no JSON (caso usuário tenha editado), senão usa o do Auth
+        username: appStateData.user?.username || googleName || 'Usuário',
         email: authUser.email || '',
-        password: '', // OAuth não retorna senha
-        avatarUrl: appStateData.user?.avatarUrl || authUser.user_metadata?.avatar_url || '',
+        password: '', 
+        // Prioriza avatar salvo, senão Google
+        avatarUrl: appStateData.user?.avatarUrl || googleAvatar || '',
         createdAt: new Date(authUser.created_at).getTime()
     };
 
@@ -104,7 +152,6 @@ export const authService = {
   },
 
   login: async (email: string, password: string): Promise<AppState | null> => {
-    // 1. Autenticação real com Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -115,7 +162,7 @@ export const authService = {
         throw new Error("Email ou senha incorretos.");
       }
       if (authError.message.includes("Email not confirmed")) {
-        throw new Error("Email não confirmado. Verifique sua caixa de entrada ou desative a confirmação no Supabase.");
+        throw new Error("Email não confirmado. Verifique sua caixa de entrada.");
       }
       throw new Error(authError.message);
     }
@@ -124,11 +171,8 @@ export const authService = {
       throw new Error("Erro desconhecido ao realizar login.");
     }
 
-    // Reutiliza a lógica de carregar sessão
     const state = await authService.loadUserSession(authData.user);
     
-    // Injeta a senha apenas localmente para a UI (requisito visual legado)
-    // Nota: Isso não afeta a segurança do banco, pois é apenas no client state
     if (state.user) {
         state.user.password = password;
     }
@@ -137,28 +181,18 @@ export const authService = {
   },
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {
-    // 1. Criar usuário no Auth do Supabase
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { username } // Salva o username nos metadados
+        data: { username }
       }
     });
 
     if (authError) {
-       console.error("Erro Supabase:", authError);
-       
-       if (authError.message.includes("rate limit")) {
-         throw new Error("Limite de emails excedido (Supabase).\n\nSOLUÇÃO: Vá no painel Supabase > Authentication > Providers > Email e DESATIVE 'Confirm email'.");
-       }
        if (authError.message.includes("User already registered")) {
          throw new Error("Este email já está cadastrado. Tente fazer login.");
        }
-       if (authError.message.includes("Password should be")) {
-         throw new Error("A senha deve ter pelo menos 6 caracteres.");
-       }
-       
        throw new Error(authError.message);
     }
 
@@ -166,32 +200,25 @@ export const authService = {
         throw new Error("Erro ao iniciar registro.");
     }
 
-    // 2. Preparar estado inicial
     const initialState = createInitialState();
     
     const user: User = {
         id: authData.user.id,
         username: username,
         email: email,
-        password: password, // Injetando a senha local
+        password: password,
         avatarUrl: '',
         createdAt: Date.now()
     };
 
-    // 3. Salvar estado inicial APENAS se houver sessão ativa
+    // Tenta salvar imediatamente
     if (authData.session) {
-        const { error: dbError } = await supabase
-            .from('app_data')
-            .insert({
-                user_id: authData.user.id,
-                data: { ...initialState, user: { avatarUrl: '', username: username } } 
-            });
-
-        if (dbError) {
-            console.error("Erro ao criar dados iniciais:", dbError);
-        }
+        await supabase.from('app_data').upsert({
+            user_id: authData.user.id,
+            data: { ...initialState, user: { avatarUrl: '', username: username } } 
+        });
     } else {
-        alert("Conta criada! O Supabase enviou um email de confirmação.\n\nPara pular isso, vá em Authentication > Providers > Email e desmarque 'Confirm Email'.");
+        alert("Conta criada! Verifique seu email para confirmar.");
     }
 
     return { user, ...initialState };
@@ -201,15 +228,11 @@ export const authService = {
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        // console.warn("Tentativa de salvar sem sessão ativa. Ignorando.");
-        return;
-    }
+    if (!session) return;
 
     const { user, ...dataToSave } = state;
     
-    // CORREÇÃO: Salvamos username e avatarUrl dentro do JSON
-    // Isso permite que a função 'search_users' do banco encontre o usuário pelo nome
+    // Salva user dentro do JSON para persistência de avatar/nome customizados
     const payload = {
         ...dataToSave,
         user: { 
@@ -227,7 +250,7 @@ export const dataService = {
         }, { onConflict: 'user_id' });
 
     if (error) {
-        console.error("Erro ao sincronizar com Supabase:", error.message);
+        console.error("Erro ao salvar:", error.message);
     }
   }
 };

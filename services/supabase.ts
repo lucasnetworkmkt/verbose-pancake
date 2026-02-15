@@ -9,16 +9,11 @@ let supabaseKey = DEFAULT_KEY;
 
 try {
   // Tenta ler do Vite environment de forma segura
-  // Usamos @ts-ignore para evitar erros de tipagem caso o ambiente esteja mal configurado
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) {
-    // @ts-ignore
+  if (import.meta.env && import.meta.env.VITE_SUPABASE_URL) {
     supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   }
   
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-    // @ts-ignore
+  if (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) {
     supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   }
 } catch (error) {

@@ -730,7 +730,7 @@ function App() {
 
       {/* MOBILE NAV OVERLAY */}
       {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col justify-end animate-in fade-in slide-in-from-bottom-10 duration-200">
+          <div className="lg:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col justify-end animate-in fade-in slide-in-from-bottom-10 duration-200">
              {/* Header to close */}
              <div className="absolute top-0 left-0 right-0 p-4 flex justify-end">
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-app-card rounded-full text-app-subtext hover:text-white border border-app-border">
@@ -762,8 +762,8 @@ function App() {
           </div>
       )}
 
-      {/* Sidebar - Desktop Only */}
-      <aside className="hidden md:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
+      {/* Sidebar - Desktop Only (Visible only on LG and up) */}
+      <aside className="hidden lg:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
         {appState.user && <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />}
         <nav className="flex-1 px-4 space-y-2 mt-8">
           {NAV_ITEMS.map((item) => {
@@ -787,8 +787,8 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* Header - Mobile Only (PROFILE & AVATAR) */}
-        <div className="md:hidden">
+        {/* Header - Mobile/Tablet Only (PROFILE & AVATAR) */}
+        <div className="lg:hidden">
             {appState.user && (
                 <MobileUserProfileHeader 
                     user={appState.user} 
@@ -801,7 +801,7 @@ function App() {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-2 md:p-8 space-y-4 md:space-y-8 scroll-smooth pb-20 md:pb-8">
+        <div className="flex-1 overflow-y-auto p-2 lg:p-8 space-y-4 md:space-y-8 scroll-smooth pb-20 lg:pb-8">
           
           {/* Toast */}
           {toast && (
@@ -1072,8 +1072,8 @@ function App() {
         </div>
       </main>
 
-      {/* Bottom Navigation - Mobile Only - UPDATED TO 3-BAR MENU STYLE */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-center z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
+      {/* Bottom Navigation - Mobile/Tablet Only (Visible on LG and below) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-center z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
         
         {/* Left: Quick Home */}
         <button 

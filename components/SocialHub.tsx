@@ -5,6 +5,7 @@ import { User, Friendship, FriendProfile } from '../types';
 import { socialService } from '../services/social';
 import ChatWindow from './ChatWindow';
 import FriendProfileModal from './FriendProfileModal';
+import { supabase } from '../services/supabase'; // Import direto para Realtime
 
 interface SocialHubProps {
   user: User;
@@ -22,19 +23,46 @@ const SocialHub: React.FC<SocialHubProps> = ({ user }) => {
   const [viewingProfile, setViewingProfile] = useState<FriendProfile | null>(null);
 
   const loadFriendships = async () => {
-      setLoading(true);
+      // Não ativamos loading aqui para não piscar a tela em updates de realtime
       try {
           const list = await socialService.getFriendships(user.id);
           setFriendships(list);
       } catch (e) {
           console.error(e);
-      } finally {
-          setLoading(false);
       }
   };
 
+  // Carregamento inicial e Configuração do Realtime
   useEffect(() => {
-      loadFriendships();
+      setLoading(true);
+      loadFriendships().then(() => setLoading(false));
+
+      // Escutar mudanças na tabela de amizades
+      const channel = supabase
+        .channel(`social-hub:${user.id}`)
+        .on('postgres_changes', { 
+            event: '*', // Insert, Update, Delete
+            schema: 'public', 
+            table: 'friendships',
+            filter: `addressee_id=eq.${user.id}` // Alguém me enviou solicitação ou respondeu
+        }, (payload) => {
+            console.log("Realtime update (incoming):", payload);
+            loadFriendships();
+        })
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'friendships',
+            filter: `requester_id=eq.${user.id}` // Alguém aceitou minha solicitação
+        }, (payload) => {
+            console.log("Realtime update (outgoing accepted):", payload);
+            loadFriendships();
+        })
+        .subscribe();
+
+      return () => {
+          supabase.removeChannel(channel);
+      };
   }, [user.id]);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -51,14 +79,15 @@ const SocialHub: React.FC<SocialHubProps> = ({ user }) => {
       try {
           await socialService.sendFriendRequest(user.id, targetId);
           alert("Solicitação enviada!");
-          setActiveView('FRIENDS');
+          // Opcional: mudar para view de amigos ou limpar busca
       } catch (e) {
-          alert("Erro ao enviar. Verifique se já não são amigos.");
+          alert("Erro ao enviar. Verifique se já não são amigos ou se já existe solicitação pendente.");
       }
   };
 
   const handleResponse = async (id: string, status: 'accepted' | 'rejected') => {
       await socialService.respondToRequest(id, status);
+      // loadFriendships será chamado pelo Realtime, mas chamamos aqui para garantir UI imediata
       loadFriendships();
   };
 

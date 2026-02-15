@@ -29,8 +29,7 @@ import {
   Camera,
   Eye,
   EyeOff,
-  ChevronDown,
-  Users
+  ChevronDown
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState } from './types';
 import { authService, dataService } from './services/storage';
@@ -44,7 +43,6 @@ import ExecutionTimer from './components/ExecutionTimer';
 import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
-import SocialHub from './components/SocialHub';
 
 // --- Subcomponents within App.tsx ---
 
@@ -302,7 +300,7 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'SOCIAL'>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
   const [showMentorModal, setShowMentorModal] = useState(false);
@@ -861,7 +859,6 @@ function App() {
   const NAV_ITEMS = [
     { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Painel' },
     { id: 'EVOLUTION', icon: MapPin, label: 'Evolução' },
-    { id: 'SOCIAL', icon: Users, label: 'Social' }, // Added Social Tab
     { id: 'METAS', icon: Target, label: 'Metas' },
     { id: 'ROUTINES', icon: ListTodo, label: 'Rotinas' },
     { id: 'NOTES', icon: FileText, label: 'Anotações' },
@@ -1126,11 +1123,6 @@ function App() {
                  </div>
               </div>
             </div>
-          )}
-          
-          {/* SOCIAL TAB */}
-          {activeTab === 'SOCIAL' && appState.user && (
-              <SocialHub user={appState.user} />
           )}
           
           {/* EVOLUTION MAP TAB */}

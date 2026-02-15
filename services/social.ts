@@ -3,34 +3,22 @@ import { supabase } from './supabase';
 import { Friendship, ChatMessage, FriendProfile, AppState } from '../types';
 
 export const socialService = {
-  // --- USER SEARCH ---
-  // Busca usuários procurando no JSON 'data' da tabela app_data pelo campo username
+  // --- USER SEARCH (VIA RPC) ---
   searchUsers: async (query: string): Promise<{ id: string, username: string, avatarUrl: string }[]> => {
-    // NOTA: Isso depende da permissão RLS do banco. Se o RLS de app_data for restrito apenas ao dono,
-    // essa busca retornará vazio para estranhos.
-    // Em produção, recomenda-se ter uma tabela 'public.profiles' sincronizada via Trigger.
-    // Como solicitado para não criar tabelas de perfil, tentaremos buscar em app_data assumindo uma policy permissiva
-    // OU usando RPC se disponível. Aqui usamos o método padrão.
-    
-    // Fallback: Se não conseguir buscar por username devido a RLS, o usuário terá que adicionar por Email exato via auth?
-    // Não temos acesso a auth.users.
-    
-    // Tentativa via app_data (assumindo que o usuário ajustou RLS ou estamos buscando amigos existentes)
-    const { data, error } = await supabase
-      .from('app_data')
-      .select('user_id, data')
-      .ilike('data->user->>username', `%${query}%`)
-      .limit(10);
+    // Usa a função de banco 'search_users' que criamos via SQL.
+    // Ela é SECURITY DEFINER, permitindo ler username/avatar de qualquer um sem expor o resto dos dados.
+    const { data, error } = await supabase.rpc('search_users', { search_query: query });
 
     if (error) {
-      console.error("Erro na busca:", error);
+      console.error("Erro na busca (RPC):", error);
       return [];
     }
 
-    return data.map((row: any) => ({
-      id: row.user_id,
-      username: row.data.user.username,
-      avatarUrl: row.data.user.avatarUrl || ''
+    // O retorno do RPC vem como array de objetos
+    return (data as any[]).map((row) => ({
+      id: row.id,
+      username: row.username,
+      avatarUrl: row.avatar_url || ''
     }));
   },
 
@@ -56,24 +44,42 @@ export const socialService = {
 
     if (error) throw error;
 
-    // Precisamos enriquecer os dados com o nome do amigo.
-    // Faremos queries individuais em app_data para pegar o nome (já que temos permissão de ler amigos aceitos)
-    // Para pendentes, talvez falhe se RLS for restrito, mas tentaremos.
-    
+    // Enriquecimento de dados usando RPC para garantir que vemos nomes mesmo de pedidos pendentes
     const enriched = await Promise.all(data.map(async (f: Friendship) => {
         const isRequester = f.requester_id === userId;
         const friendId = isRequester ? f.addressee_id : f.requester_id;
         
-        const { data: friendData } = await supabase
-            .from('app_data')
-            .select('data')
-            .eq('user_id', friendId)
-            .single();
+        let username = 'Usuário';
+        let avatar = '';
+
+        try {
+            // Tenta buscar perfil público via RPC
+            const { data: profileData, error: rpcError } = await supabase.rpc('get_public_profile', { target_id: friendId });
+            
+            if (!rpcError && profileData && profileData.length > 0) {
+                username = profileData[0].username;
+                avatar = profileData[0].avatar_url;
+            } else {
+                // Fallback: Tenta ler direto se for amigo aceito (Policy permite)
+                const { data: directData } = await supabase
+                    .from('app_data')
+                    .select('data')
+                    .eq('user_id', friendId)
+                    .single();
+                
+                if (directData) {
+                    username = directData.data?.user?.username || 'Usuário';
+                    avatar = directData.data?.user?.avatarUrl || '';
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao carregar perfil do amigo", e);
+        }
             
         return {
             ...f,
-            friend_username: friendData?.data?.user?.username || 'Usuário',
-            friend_avatar: friendData?.data?.user?.avatarUrl || ''
+            friend_username: username,
+            friend_avatar: avatar
         };
     }));
 

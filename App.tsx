@@ -57,8 +57,8 @@ const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
   const [showCancel, setShowCancel] = useState(false);
 
   useEffect(() => {
-    // Se demorar mais de 6 segundos, mostra opção de cancelar/sair
-    const timer = setTimeout(() => setShowCancel(true), 6000);
+    // Timeout de segurança: Se demorar mais de 3 segundos, permite sair.
+    const timer = setTimeout(() => setShowCancel(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -74,12 +74,15 @@ const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
         <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
 
         {showCancel && onCancel && (
-            <button 
-                onClick={onCancel}
-                className="mt-8 flex items-center gap-2 text-app-red border border-app-red/30 px-4 py-2 rounded hover:bg-app-red/10 transition-colors text-xs uppercase font-bold"
-            >
-                <LogOut size={14} /> Demorando muito? Cancelar/Sair
-            </button>
+            <div className="mt-8 flex flex-col items-center gap-2 animate-in slide-in-from-bottom-5 fade-in">
+                <p className="text-app-red text-[10px] uppercase font-bold">Está demorando mais que o normal?</p>
+                <button 
+                    onClick={onCancel}
+                    className="flex items-center gap-2 text-white bg-app-red hover:bg-red-700 px-6 py-3 rounded transition-colors text-xs uppercase font-bold tracking-wider shadow-lg"
+                >
+                    <LogOut size={14} /> Forçar Logout / Cancelar
+                </button>
+            </div>
         )}
     </div>
   );
@@ -333,60 +336,99 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  // --- INITIAL SESSION CHECK ---
+  const handleLogout = async () => {
+    // 1. Force clear supabase session
+    try {
+        await supabase.auth.signOut();
+    } catch (e) { 
+        console.error("Logout error (ignored):", e); 
+    }
+    
+    // 2. Clear local storage explicitly if needed
+    localStorage.clear();
+
+    // 3. Reset React State
+    setAppState(null);
+    setLoadingError(null);
+    setIsLoading(false); 
+    // This effectively returns user to AuthScreen
+  };
+
+  // --- ROBUST INITIALIZATION ---
   useEffect(() => {
     let mounted = true;
 
-    // Use a flag to avoid race conditions between checkSession and onAuthStateChange
-    let isFetching = false;
-
-    const loadData = async (user: any) => {
-        if (isFetching) return;
-        isFetching = true;
-        
-        if (mounted) {
-            setIsLoading(true);
-            setLoadingError(null);
-        }
+    const initializeApp = async () => {
+        setIsLoading(true);
+        setLoadingError(null);
 
         try {
-            const state = await authService.loadUserSession(user);
+            // 1. Get Session with a hard timeout of 5s for the initial check
+            // We race the getSession promise against a timeout
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout ao conectar com Supabase")), 5000));
+            
+            const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
             if (mounted) {
-                setAppState(state);
-                setIsLoading(false);
+                if (data.session?.user) {
+                    console.log("Sessão encontrada. Carregando dados...");
+                    // User found, load data
+                    try {
+                        const state = await authService.loadUserSession(data.session.user);
+                        if (mounted) {
+                            setAppState(state);
+                            setIsLoading(false);
+                        }
+                    } catch (loadErr: any) {
+                         console.error("Erro fatal no carregamento de dados:", loadErr);
+                         if (mounted) {
+                             setLoadingError(loadErr.message || "Erro ao carregar dados do usuário.");
+                             setIsLoading(false);
+                         }
+                    }
+                } else {
+                    console.log("Nenhuma sessão ativa. Exibindo login.");
+                    // No user, stop loading immediately
+                    setIsLoading(false);
+                }
             }
         } catch (err: any) {
-            console.error("Erro no load:", err);
+            console.error("Erro na inicialização:", err);
             if (mounted) {
-                setLoadingError(err.message || "Falha ao carregar dados.");
-                setIsLoading(false); // Stop spinning even on error
+                // If it was a timeout or connection error, we stop loading and show login or error
+                // If we treat it as no session, user can try to login again
+                setIsLoading(false); 
             }
-        } finally {
-            isFetching = false;
         }
     };
 
-    // 1. Initial Check
-    const init = async () => {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-            await loadData(data.session.user);
-        } else {
-            if (mounted) setIsLoading(false);
-        }
-    };
-    init();
+    initializeApp();
 
-    // 2. Auth Listener
+    // 2. Listen for auth changes (Login/Logout events)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth Event:", event);
+        console.log("Auth State Changed:", event);
         if (event === 'SIGNED_IN' && session?.user) {
-            await loadData(session.user);
+            // Only load if we aren't already loaded/loading to avoid loops
+            if (!appState && !isLoading) {
+                 setIsLoading(true);
+                 try {
+                    const state = await authService.loadUserSession(session.user);
+                    if (mounted) {
+                        setAppState(state);
+                        setIsLoading(false);
+                    }
+                 } catch (err: any) {
+                     if (mounted) {
+                        setLoadingError(err.message);
+                        setIsLoading(false);
+                     }
+                 }
+            }
         } else if (event === 'SIGNED_OUT') {
             if (mounted) {
                 setAppState(null);
                 setIsLoading(false);
-                setLoadingError(null);
             }
         }
     });
@@ -427,14 +469,6 @@ function App() {
       state.evolution.level3 = { isStarted: false, completedDays: [], lastCompletionDate: null, startDate: null };
     }
     setAppState(state);
-  };
-
-  const handleLogout = async () => {
-    try {
-        await supabase.auth.signOut();
-    } catch (e) { console.error(e); }
-    setAppState(null);
-    setLoadingError(null);
   };
 
   const handleToggleTheme = () => {

@@ -151,12 +151,13 @@ export interface AppState {
   routines: Routine[];
   notes: Note[]; 
   documents: DocumentItem[];
+  pdfs: PdfDocument[]; // Adicionado campo para arquivos
   dayLogs: Record<string, DayLog>;
   lastCheckIn: string | null;
   settings: {
     silentMode: boolean;
     validDayThreshold: number;
-    theme: 'dark' | 'light'; // Adicionado
+    theme: 'dark' | 'light';
   };
   timer?: ExecutionTimer;
   evolution?: EvolutionState;

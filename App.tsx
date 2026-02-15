@@ -31,7 +31,7 @@ import {
   EyeOff,
   ChevronDown
 } from 'lucide-react';
-import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState } from './types';
+import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
 import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
 import CheckInModal from './components/CheckInModal';
@@ -787,7 +787,35 @@ function App() {
           const updatedDocs = currentDocs.filter(d => d.id !== id);
           return { ...prev, documents: updatedDocs };
       });
-      showToast("Documento excluído.");
+      showToast("Link excluído.");
+  };
+
+  // PDF Handlers
+  const handleAddPdf = (pdf: PdfDocument) => {
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentPdfs = prev.pdfs || [];
+          return { ...prev, pdfs: [pdf, ...currentPdfs] };
+      });
+  };
+
+  const handleUpdatePdf = (updatedPdf: PdfDocument) => {
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentPdfs = prev.pdfs || [];
+          const updatedPdfs = currentPdfs.map(p => p.id === updatedPdf.id ? updatedPdf : p);
+          return { ...prev, pdfs: updatedPdfs };
+      });
+  };
+
+  const handleDeletePdf = (id: string) => {
+      setAppState(prev => {
+          if(!prev) return null;
+          const currentPdfs = prev.pdfs || [];
+          const updatedPdfs = currentPdfs.filter(p => p.id !== id);
+          return { ...prev, pdfs: updatedPdfs };
+      });
+      showToast("Arquivo excluído.");
   };
 
   // --- Render ---
@@ -809,6 +837,7 @@ function App() {
   
   const userNotes = appState.notes || [];
   const userDocuments = appState.documents || [];
+  const userPdfs = appState.pdfs || []; // New PDF array
   const evolutionState = appState.evolution || { completedDays: [], startDate: null, completedDaysLevel2: [], startDateLevel2: null, level3: { isStarted: false, completedDays: [], lastCompletionDate: null, startDate: null } };
 
   // Logic to find current active evolution challenge (Across 3 levels)
@@ -1354,6 +1383,7 @@ function App() {
                 <NotesManager 
                    notes={userNotes}
                    documents={userDocuments}
+                   pdfs={userPdfs}
                    goals={appState.goals}
                    onAddNote={handleAddNote}
                    onUpdateNote={handleUpdateNote}
@@ -1361,6 +1391,9 @@ function App() {
                    onAddDocument={handleAddDocument}
                    onUpdateDocument={handleUpdateDocument}
                    onDeleteDocument={handleDeleteDocument}
+                   onAddPdf={handleAddPdf}
+                   onUpdatePdf={handleUpdatePdf}
+                   onDeletePdf={handleDeletePdf}
                 />
              </div>
           )}

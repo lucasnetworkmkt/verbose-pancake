@@ -94,6 +94,15 @@ export interface PdfDocument {
   notes: string;
 }
 
+export interface Transaction {
+  id: string;
+  user_id: string;
+  type: 'ganho' | 'despesa';
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
 export interface User {
   id: string;
   username: string;

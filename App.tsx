@@ -656,7 +656,7 @@ function App() {
                    <div className="bg-app-card p-4 rounded border border-app-gold mb-6 text-left text-xs text-app-subtext">
                        <strong>Atenção:</strong> Isso geralmente acontece porque o banco de dados tem regras de segurança antigas. 
                        <br/><br/>
-                       1. Vá no Supabase > SQL Editor
+                       1. Vá no Supabase &gt; SQL Editor
                        <br/>
                        2. Cole o código SQL de correção
                        <br/>

@@ -32,11 +32,16 @@ import {
   ChevronDown,
   User as UserIcon,
   DollarSign,
-  Grid
+  Grid,
+  Globe,
+  Loader2,
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
-import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
+import { supabase } from './services/supabase';
+import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3, FALLBACK_AVATAR_URL } from './constants';
 import CheckInModal from './components/CheckInModal';
 import RoutineList from './components/RoutineList';
 import HistoryChart from './components/HistoryChart';
@@ -48,6 +53,61 @@ import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
 
+// --- CONSTANTS ---
+const NAV_ITEMS = [
+  { id: 'DASHBOARD', label: 'Início', icon: LayoutDashboard },
+  { id: 'EVOLUTION', label: 'Evolução', icon: MapPin },
+  { id: 'METAS', label: 'Metas', icon: Target },
+  { id: 'ROUTINES', label: 'Rotinas', icon: ListTodo },
+  { id: 'HISTORY', label: 'Hist', icon: CalendarIcon },
+  { id: 'TIMER', label: 'Timer', icon: Timer },
+  { id: 'NOTES', label: 'Anotações', icon: FileText },
+  { id: 'FINANCE', label: 'Finanças', icon: DollarSign },
+];
+
+// --- Loading Screen Component Enhanced ---
+const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
+  const [showCancel, setShowCancel] = useState(false);
+
+  useEffect(() => {
+    // Timeout de segurança mais rápido: 2.5 segundos
+    const timer = setTimeout(() => setShowCancel(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleHardReset = () => {
+      localStorage.clear();
+      sessionStorage.clear();
+      if(onCancel) onCancel();
+      window.location.reload();
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text animate-in fade-in duration-500 relative z-50">
+        <div className="relative mb-6">
+            <div className="w-16 h-16 border-4 border-app-input border-t-app-gold rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <Shield size={20} className="text-app-subtext opacity-50" />
+            </div>
+        </div>
+        <h2 className="text-xl font-bold uppercase tracking-widest animate-pulse text-app-gold">Carregando Sistema</h2>
+        <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
+
+        {showCancel && (
+            <div className="mt-8 flex flex-col items-center gap-3 animate-in slide-in-from-bottom-5 fade-in">
+                <p className="text-app-subtext text-[10px] uppercase font-bold">Demorando? Você pode reiniciar a sessão.</p>
+                <button 
+                    onClick={handleHardReset}
+                    className="flex items-center gap-2 text-white bg-app-red hover:bg-red-700 px-6 py-3 rounded transition-colors text-xs uppercase font-bold tracking-wider shadow-lg"
+                >
+                    <LogOut size={14} /> Resetar / Sair
+                </button>
+            </div>
+        )}
+    </div>
+  );
+};
+
 // --- Subcomponents within App.tsx ---
 
 const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
@@ -57,12 +117,12 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // --- VALIDAÇÕES LOCAIS ---
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         setError("Formato de email inválido.\nCertifique-se de usar algo como 'exemplo@gmail.com'.");
@@ -78,7 +138,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
         setError("O nome de usuário deve ter pelo menos 3 caracteres.");
         return;
     }
-    // -------------------------
 
     setLoading(true);
     try {
@@ -96,9 +155,26 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
     }
   };
 
+  const handleOtpLogin = async () => {
+      if (!email) {
+          setError("Digite seu email para receber o código.");
+          return;
+      }
+      setLoading(true);
+      setError('');
+      try {
+          await authService.loginWithOtp(email);
+          setOtpSent(true);
+          setLoading(false);
+      } catch (err: any) {
+          setError("Erro ao enviar código: " + err.message);
+          setLoading(false);
+      }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
-      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border">
+    <div className="min-h-screen flex items-center justify-center bg-app-bg p-4 animate-in fade-in zoom-in duration-300">
+      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border shadow-2xl">
         <h1 className="text-3xl font-bold text-center text-app-text mb-2">CÓDIGO DA EXECUÇÃO</h1>
         <p className="text-center text-app-subtext mb-8 text-sm">Sistema de Controle & Disciplina</p>
         
@@ -108,90 +184,197 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
             </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegister && (
-            <div>
-              <label className="block text-xs text-app-subtext mb-1 uppercase">Nome de Usuário</label>
-              <input 
-                type="text" 
-                required 
-                className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-              />
+        {otpSent ? (
+            <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto text-green-500">
+                    <Mail size={32} />
+                </div>
+                <h3 className="text-lg font-bold text-app-text">Link Enviado!</h3>
+                <p className="text-app-subtext text-sm">Enviamos um link de acesso para <strong>{email}</strong>.</p>
+                <p className="text-app-subtext text-xs mt-2">Clique no link do email para entrar automaticamente.</p>
+                <button onClick={() => setOtpSent(false)} className="text-app-gold text-xs underline mt-4">Voltar</button>
             </div>
-          )}
-          <div>
-            <label className="block text-xs text-app-subtext mb-1 uppercase">Email</label>
-            <input 
-              type="email" 
-              required 
-              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-app-subtext mb-1 uppercase">Senha</label>
-            <input 
-              type="password" 
-              required 
-              className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
-          
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-app-red hover:bg-red-700 text-white font-bold py-3 uppercase tracking-wider transition-colors disabled:opacity-50 mt-6"
-          >
-            {loading ? 'Conectando...' : (isRegister ? 'Criar Conta' : 'Acessar Sistema')}
-          </button>
-        </form>
+        ) : (
+            <>
+                <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+                {isRegister && (
+                    <div>
+                    <label className="block text-xs text-app-subtext mb-1 uppercase">Nome de Usuário</label>
+                    <input type="text" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={username} onChange={e => setUsername(e.target.value)} />
+                    </div>
+                )}
+                <div>
+                    <label className="block text-xs text-app-subtext mb-1 uppercase">Email</label>
+                    <input type="email" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={email} onChange={e => setEmail(e.target.value)} />
+                </div>
+                <div>
+                    <label className="block text-xs text-app-subtext mb-1 uppercase">Senha</label>
+                    <input type="password" required className="w-full bg-app-input border border-app-border text-app-text p-3 rounded focus:border-app-gold focus:outline-none transition-colors" value={password} onChange={e => setPassword(e.target.value)} />
+                </div>
+                
+                <button type="submit" disabled={loading} className="w-full bg-app-red hover:bg-red-700 text-white font-bold py-3 uppercase tracking-wider transition-colors disabled:opacity-50 mt-6">
+                    {loading ? 'Conectando...' : (isRegister ? 'Criar Conta' : 'Acessar Sistema')}
+                </button>
 
-        <div className="mt-6 text-center">
-          <button 
-            onClick={() => { setIsRegister(!isRegister); setError(''); }}
-            className="text-app-subtext hover:text-app-text text-sm underline"
-          >
-            {isRegister ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastrar'}
-          </button>
-        </div>
+                {!isRegister && (
+                    <button 
+                        type="button" 
+                        onClick={handleOtpLogin}
+                        className="w-full bg-transparent border border-app-border text-app-subtext hover:text-app-text hover:border-app-text font-bold py-3 uppercase tracking-wider transition-colors rounded mt-4 text-xs"
+                    >
+                        Entrar com código por email
+                    </button>
+                )}
+                </form>
+
+                <div className="mt-6 text-center">
+                <button onClick={() => { setIsRegister(!isRegister); setError(''); }} className="text-app-subtext hover:text-app-text text-sm underline">
+                    {isRegister ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastrar'}
+                </button>
+                </div>
+            </>
+        )}
       </div>
     </div>
   );
 };
 
-// --- Theme Toggle Button Component ---
-const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light', onToggle: () => void }) => {
-    return (
-        <button 
-            onClick={onToggle}
-            className="relative p-1.5 rounded-full border border-app-border hover:border-app-gold bg-app-input transition-all duration-300 group overflow-hidden w-8 h-8 flex items-center justify-center shadow-sm"
-            title={theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+// --- Main App Logic ---
+
+const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) => (
+  <button
+    onClick={onToggle}
+    className="p-2 rounded-full bg-app-input text-app-subtext hover:text-app-gold transition-colors flex items-center justify-center"
+    title={`Mudar para tema ${theme === 'dark' ? 'claro' : 'escuro'}`}
+  >
+    {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+  </button>
+);
+
+const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User; onUpdateAvatar: (url: string) => void }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result as string;
+            onUpdateAvatar(base64);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
+  const handleChangePassword = async () => {
+      setPasswordMsg(null);
+      if (newPassword !== confirmNewPassword) {
+          setPasswordMsg({ type: 'error', text: 'As senhas não coincidem.' });
+          return;
+      }
+      if (newPassword.length < 6) {
+          setPasswordMsg({ type: 'error', text: 'A senha deve ter no mínimo 6 caracteres.' });
+          return;
+      }
+
+      try {
+          await authService.updatePassword(newPassword);
+          setPasswordMsg({ type: 'success', text: 'Senha alterada com sucesso.' });
+          setNewPassword('');
+          setConfirmNewPassword('');
+          setTimeout(() => setIsChangingPassword(false), 2000);
+      } catch (e: any) {
+          setPasswordMsg({ type: 'error', text: e.message });
+      }
+  };
+
+  return (
+    <div className="flex flex-col items-center p-6 border-b border-app-border bg-app-card/30">
+        <div 
+            className="relative w-20 h-20 mb-3 rounded-full overflow-hidden border-2 border-app-gold cursor-pointer group"
+            onMouseEnter={() => setIsExpanded(true)}
+            onClick={() => fileInputRef.current?.click()}
         >
-            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'}`}>
-                <Sun size={16} className="text-app-gold" />
+            <img 
+                src={user.avatarUrl || FALLBACK_AVATAR_URL} 
+                alt="Avatar" 
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_AVATAR_URL }}
+            />
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera size={24} className="text-white" />
             </div>
-            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? '-rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'}`}>
-                <Moon size={16} className="text-blue-500" />
-            </div>
+        </div>
+        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+        
+        <h3 className="text-lg font-bold text-app-text truncate max-w-full cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>{user.username}</h3>
+        <button onClick={() => setIsExpanded(!isExpanded)} className="text-[10px] text-app-subtext uppercase tracking-widest hover:text-app-gold flex items-center gap-1">
+            Configurações <ChevronDown size={10} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </button>
-    );
+
+        {isExpanded && (
+            <div className="w-full mt-4 space-y-4 animate-in slide-in-from-top-2">
+                <div className="text-xs text-app-subtext bg-app-input p-2 rounded break-all border border-app-border">
+                    {user.email}
+                </div>
+                
+                <div className="border-t border-app-border pt-4">
+                    <button 
+                        onClick={() => setIsChangingPassword(!isChangingPassword)}
+                        className="flex items-center justify-between w-full text-xs text-app-text hover:text-app-gold mb-2 font-bold uppercase"
+                    >
+                        <span>Alterar Senha</span>
+                        <Lock size={12} />
+                    </button>
+                    
+                    {isChangingPassword && (
+                        <div className="space-y-2">
+                            <input 
+                                type="password" 
+                                placeholder="Nova senha" 
+                                className="w-full bg-app-input border border-app-border p-2 rounded text-xs text-app-text focus:border-app-gold outline-none"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                            />
+                            <input 
+                                type="password" 
+                                placeholder="Confirmar nova senha" 
+                                className="w-full bg-app-input border border-app-border p-2 rounded text-xs text-app-text focus:border-app-gold outline-none"
+                                value={confirmNewPassword}
+                                onChange={e => setConfirmNewPassword(e.target.value)}
+                            />
+                            {passwordMsg && (
+                                <p className={`text-[10px] ${passwordMsg.type === 'error' ? 'text-app-red' : 'text-green-500'}`}>
+                                    {passwordMsg.text}
+                                </p>
+                            )}
+                            <button 
+                                onClick={handleChangePassword}
+                                className="w-full bg-app-gold text-black text-xs font-bold py-2 rounded uppercase hover:bg-yellow-400 transition-colors"
+                            >
+                                Salvar Nova Senha
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+    </div>
+  );
 };
 
-// --- Mobile User Profile Header Component ---
-const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, onLogout }: { 
-    user: User, 
-    onUpdateAvatar: (url: string) => void,
-    theme: 'dark' | 'light',
-    onToggleTheme: () => void,
-    onLogout: () => void
-}) => {
+const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, onLogout }: { user: User; onUpdateAvatar: (url: string) => void; theme: 'dark'|'light'; onToggleTheme: () => void; onLogout: () => void }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+    const [isChangingPassword, setIsChangingPassword] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [passwordMsg, setPasswordMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,201 +389,110 @@ const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, o
         }
     };
 
+    const handleChangePassword = async () => {
+        setPasswordMsg(null);
+        if (newPassword !== confirmNewPassword) {
+            setPasswordMsg({ type: 'error', text: 'Senhas não conferem.' });
+            return;
+        }
+        if (newPassword.length < 6) {
+            setPasswordMsg({ type: 'error', text: 'Mínimo 6 caracteres.' });
+            return;
+        }
+  
+        try {
+            await authService.updatePassword(newPassword);
+            setPasswordMsg({ type: 'success', text: 'Senha alterada!' });
+            setNewPassword('');
+            setConfirmNewPassword('');
+            setTimeout(() => setIsChangingPassword(false), 2000);
+        } catch (e: any) {
+            setPasswordMsg({ type: 'error', text: e.message });
+        }
+    };
+
     return (
-        <div className="bg-app-bg border-b border-app-border z-30 transition-all duration-300">
-            {/* Main Header Bar */}
-            <div className="flex items-center justify-between p-3">
-                {/* Left: Profile Trigger */}
-                <div 
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex items-center gap-3 cursor-pointer select-none"
-                >
-                    <div className="w-8 h-8 rounded-full border border-app-gold/50 overflow-hidden shrink-0 shadow-sm">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-xs">
-                                {user.username.charAt(0).toUpperCase()}
-                            </div>
-                        )}
+        <div className="bg-app-card border-b border-app-border sticky top-0 z-30 flex flex-col">
+            <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3" onClick={() => setIsExpanded(!isExpanded)}>
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-app-gold relative">
+                        <img 
+                            src={user.avatarUrl || FALLBACK_AVATAR_URL} 
+                            alt="Avatar" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_AVATAR_URL }}
+                        />
                     </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-app-text text-sm leading-none flex items-center gap-1">
+                    <div>
+                        <h3 className="font-bold text-sm text-app-text leading-tight flex items-center gap-1">
                             {user.username} 
-                            <ChevronDown size={14} className={`text-app-subtext transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                        </span>
-                        <span className="text-[10px] text-app-subtext leading-none mt-0.5">Ver Perfil</span>
+                            <ChevronDown size={12} className={`text-app-subtext transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </h3>
+                        <p className="text-[10px] text-app-subtext uppercase">Perfil</p>
                     </div>
                 </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-                    <button onClick={onLogout} className="text-app-subtext hover:text-app-red p-1">
-                        <LogOut size={18} />
+                    <button onClick={onLogout} className="p-2 text-app-subtext hover:text-app-red transition-colors">
+                        <LogOut size={20} />
                     </button>
                 </div>
             </div>
 
-            {/* Expandable Content */}
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-64 opacity-100 border-t border-app-border' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 bg-app-input/50 space-y-4">
-                     {/* Avatar Upload */}
-                    <div className="flex items-center gap-4">
-                        <div 
-                            className="relative w-16 h-16 rounded-full border-2 border-app-gold overflow-hidden cursor-pointer group shadow-md shrink-0"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar Large" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-2xl">
-                                    {user.username.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                <Camera size={20} className="text-white opacity-80" />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                             <p className="text-xs text-app-subtext mb-1">Alterar Foto de Perfil</p>
-                             <button 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="text-[10px] bg-app-card border border-app-border px-3 py-1.5 rounded uppercase font-bold text-app-text hover:border-app-gold transition-colors"
-                             >
-                                Selecionar Imagem
-                             </button>
-                        </div>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            accept="image/*"
-                            onChange={handleFileChange}
-                        />
-                    </div>
-
-                    {/* Email & Password Compact */}
-                    <div className="grid grid-cols-1 gap-2">
-                        <div className="bg-app-bg border border-app-border rounded p-2 flex items-center justify-between">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <Mail size={12} className="text-app-subtext shrink-0" />
-                                <span className="text-[10px] text-app-text truncate">{user.email}</span>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-app-bg border border-app-border rounded p-2 flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <Shield size={12} className="text-app-subtext shrink-0" />
-                                <span className="text-[10px] text-app-text font-mono">
-                                    {showPassword ? (user.password || '******') : '••••••••'}
-                                </span>
-                             </div>
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }}
-                                className="text-app-subtext hover:text-app-gold p-1"
-                             >
-                                {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
-                             </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Desktop Sidebar Profile ---
-const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvatar: (url: string) => void }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                onUpdateAvatar(base64);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    return (
-        <div className="border-b border-app-border bg-app-input/30 transition-all duration-300">
-            {/* Header (Always Visible) - Click to toggle */}
-            <div 
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-4 flex items-center gap-3 cursor-pointer hover:bg-app-hover/50 transition-colors group select-none"
-            >
-                {/* Small Avatar Preview */}
-                <div className="w-10 h-10 rounded-full border border-app-gold/50 overflow-hidden shrink-0 shadow-sm group-hover:border-app-gold transition-colors">
-                    {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-sm">
-                            {user.username.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                </div>
-                
-                {/* User Info & Toggle Icon */}
-                <div className="min-w-0 flex-1 flex items-center justify-between">
-                    <div className="overflow-hidden">
-                        <h3 className="font-bold text-app-text truncate text-sm group-hover:text-app-gold transition-colors">{user.username}</h3>
-                        <p className="text-[10px] text-app-subtext truncate font-medium">
-                            {isExpanded ? 'Fechar detalhes' : 'Ver perfil'}
-                        </p>
-                    </div>
-                    <ChevronDown 
-                        size={16} 
-                        className={`text-app-subtext transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`} 
-                    />
-                </div>
-            </div>
-
-            {/* Expanded Details Area */}
             {isExpanded && (
-                <div className="px-4 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300 border-t border-app-border/30 pt-4 bg-app-bg/30">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                        <div 
-                            className="relative w-24 h-24 rounded-full border-2 border-app-gold overflow-hidden cursor-pointer group shadow-xl"
-                            onClick={() => fileInputRef.current?.click()}
+                <div className="bg-app-input p-4 border-t border-app-border animate-in slide-in-from-top-5">
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 text-xs text-app-subtext hover:text-app-text mb-4 w-full p-2 border border-app-border rounded"
+                    >
+                        <Camera size={14} /> Alterar Foto
+                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+
+                    <div className="border-t border-app-border pt-2">
+                        <button 
+                            onClick={() => setIsChangingPassword(!isChangingPassword)}
+                            className="flex items-center justify-between w-full text-xs font-bold text-app-text uppercase py-2"
                         >
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar Large" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                            ) : (
-                                <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-3xl">
-                                    {user.username.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                <Camera size={24} className="text-white mb-1" />
-                                <span className="text-[9px] text-white font-bold uppercase tracking-widest">Alterar</span>
+                            <span>Alterar Senha</span>
+                            <Lock size={12} />
+                        </button>
+
+                        {isChangingPassword && (
+                            <div className="space-y-2 mt-2">
+                                <input 
+                                    type="password" 
+                                    placeholder="Nova senha" 
+                                    className="w-full bg-app-card border border-app-border p-2 rounded text-xs text-app-text focus:border-app-gold outline-none"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                />
+                                <input 
+                                    type="password" 
+                                    placeholder="Confirmar" 
+                                    className="w-full bg-app-card border border-app-border p-2 rounded text-xs text-app-text focus:border-app-gold outline-none"
+                                    value={confirmNewPassword}
+                                    onChange={e => setConfirmNewPassword(e.target.value)}
+                                />
+                                {passwordMsg && (
+                                    <p className={`text-[10px] ${passwordMsg.type === 'error' ? 'text-app-red' : 'text-green-500'}`}>
+                                        {passwordMsg.text}
+                                    </p>
+                                )}
+                                <button 
+                                    onClick={handleChangePassword}
+                                    className="w-full bg-app-gold text-black text-xs font-bold py-2 rounded uppercase hover:bg-yellow-400 transition-colors"
+                                >
+                                    Confirmar
+                                </button>
                             </div>
-                        </div>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1"><Mail size={10} /> Email</label>
-                        <div className="w-full bg-app-bg border border-app-border rounded p-2 text-xs text-app-text break-all font-medium">{user.email}</div>
-                    </div>
-                    <div className="space-y-1">
-                         <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1"><Shield size={10} /> Senha</label>
-                        <div className="flex items-center justify-between bg-app-bg border border-app-border rounded p-2">
-                            <span className="text-xs text-app-text font-mono truncate mr-2 select-all">{showPassword ? (user.password || '******') : '••••••••'}</span>
-                            <button onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }} className="text-app-subtext hover:text-app-gold transition-colors p-1">{showPassword ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                        </div>
+                        )}
                     </div>
                 </div>
             )}
         </div>
     );
 };
-
-// --- Main App Logic ---
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
@@ -410,7 +502,117 @@ function App() {
   const [showMentorModal, setShowMentorModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+
+  // --- LOGOUT ROBUSTO ---
+  const handleLogout = async () => {
+    // 1. Tenta logout no Supabase
+    try {
+        await supabase.auth.signOut();
+    } catch (e) { 
+        console.error("Logout error (ignored):", e); 
+    }
+    
+    // 2. Limpa armazenamento local
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // 3. Reseta estado React
+    setAppState(null);
+    setLoadingError(null);
+    setIsLoading(false); 
+    
+    // 4. Reload forçado para garantir limpeza de memória e estado
+    window.location.reload();
+  };
+
+  // --- INICIALIZAÇÃO ROBUSTA ---
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeApp = async () => {
+        setIsLoading(true);
+        setLoadingError(null);
+
+        try {
+            // Check Session
+            const sessionPromise = supabase.auth.getSession();
+            // Timeout de 5s para evitar tela branca eterna
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout Supabase")), 5000));
+            
+            const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+            if (mounted) {
+                if (data.session?.user) {
+                    console.log("Sessão recuperada:", data.session.user.id);
+                    try {
+                        const state = await authService.loadUserSession(data.session.user);
+                        if (mounted) {
+                            setAppState(state);
+                            setIsLoading(false);
+                            // Notifica o usuário que a sessão foi restaurada (Auto-Login)
+                            setToast("Sessão restaurada com sucesso.");
+                            setTimeout(() => setToast(null), 3000);
+                        }
+                    } catch (loadErr: any) {
+                         console.error("Erro ao carregar dados:", loadErr);
+                         if (mounted) {
+                             setLoadingError(loadErr.message || "Falha ao carregar perfil.");
+                             setIsLoading(false);
+                         }
+                    }
+                } else {
+                    console.log("Sem sessão ativa.");
+                    setIsLoading(false);
+                }
+            }
+        } catch (err: any) {
+            console.error("Init error:", err);
+            if (mounted) {
+                setIsLoading(false); // Libera para AuthScreen em caso de erro de conexão/timeout
+            }
+        }
+    };
+
+    initializeApp();
+
+    // Auth Listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth Event:", event);
+        if (event === 'SIGNED_IN' && session?.user) {
+            // Carrega apenas se ainda não estiver carregado/carregando
+            if (!appState && !isLoading) {
+                 setIsLoading(true);
+                 try {
+                    const state = await authService.loadUserSession(session.user);
+                    if (mounted) {
+                        setAppState(state);
+                        setIsLoading(false);
+                    }
+                 } catch (err: any) {
+                     if (mounted) {
+                        setLoadingError(err.message);
+                        setIsLoading(false);
+                     }
+                 }
+            }
+        } else if (event === 'SIGNED_OUT') {
+            if (mounted) {
+                setAppState(null);
+                setIsLoading(false);
+            }
+        }
+    });
+
+    return () => {
+        mounted = false;
+        authListener.subscription.unsubscribe();
+    };
+  }, []); 
+
+  // ... (Efeitos e handlers existentes mantidos)
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -440,10 +642,6 @@ function App() {
       state.evolution.level3 = { isStarted: false, completedDays: [], lastCompletionDate: null, startDate: null };
     }
     setAppState(state);
-  };
-
-  const handleLogout = () => {
-    setAppState(null);
   };
 
   const handleToggleTheme = () => {
@@ -629,7 +827,7 @@ function App() {
       setAppState(prev => prev ? ({ ...prev, timer: newTimerState }) : null);
   };
 
-  // Evolution Handlers (Level 1, 2, 3)...
+  // ... (Evolution & Note Handlers mantidos)
   const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution!, startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado. Relógio rodando."); };
   const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution, completedDays: [...currentCompleted, day] } }; } return prev; }); };
   const handleUndoEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; return { ...prev, evolution: { ...prev.evolution, completedDays: currentCompleted.filter(d => d !== day) } }; }); };
@@ -639,7 +837,6 @@ function App() {
   const handleStartLevel3 = () => { setAppState(prev => { if(!prev || !prev.evolution) return null; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...prev.evolution, level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
   const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...prev.evolution, level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
 
-  // Note, Doc, PDF Handlers...
   const handleAddNote = (note: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; return { ...prev, notes: [note, ...currentNotes] }; }); };
   const handleUpdateNote = (updatedNote: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.map(n => n.id === updatedNote.id ? updatedNote : n); return { ...prev, notes: updatedNotes }; }); };
   const handleDeleteNote = (id: string) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.filter(n => n.id !== id); return { ...prev, notes: updatedNotes }; }); showToast("Anotação excluída."); };
@@ -652,10 +849,44 @@ function App() {
 
   // --- Render ---
 
+  if (isLoading || loadingError) {
+      if (loadingError) {
+          return (
+             <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text p-8 text-center animate-in fade-in zoom-in duration-300">
+                <AlertOctagon size={48} className="text-app-red mb-4" />
+                <h2 className="text-xl font-bold uppercase mb-2">Erro ao Iniciar</h2>
+                <p className="text-app-subtext mb-6">{loadingError}</p>
+                
+                {loadingError.includes("permissão") && (
+                   <div className="bg-app-card p-4 rounded border border-app-gold mb-6 text-left text-xs text-app-subtext">
+                       <strong>Atenção:</strong> Erro de segurança no banco de dados.
+                       <br/><br/>
+                       1. Vá no Supabase &gt; SQL Editor
+                       <br/>
+                       2. Cole o código SQL de correção
+                       <br/>
+                       3. Clique em "Run"
+                   </div>
+                )}
+
+                <button 
+                    onClick={handleLogout} 
+                    className="bg-app-text text-app-bg px-6 py-3 font-bold uppercase rounded hover:opacity-80 transition-opacity"
+                >
+                    Reiniciar Sistema
+                </button>
+             </div>
+          );
+      }
+      return <LoadingScreen onCancel={handleLogout} />;
+  }
+
   if (!appState) {
     return <AuthScreen onLogin={handleLogin} />;
   }
 
+  // --- RENDER MAIN APP ---
+  // (Mantém o código de renderização do Dashboard, Tabs e Sidebar igual)
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayLog = appState.dayLogs[todayStr];
   const streak = calculateStreak();
@@ -706,21 +937,6 @@ function App() {
 
   const isTimerRunning = currentTimerState.status === 'RUNNING';
 
-  const NAV_ITEMS = [
-    { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Painel' },
-    { id: 'EVOLUTION', icon: MapPin, label: 'Evolução' },
-    { id: 'METAS', icon: Target, label: 'Metas' },
-    { id: 'ROUTINES', icon: ListTodo, label: 'Rotinas' },
-    { id: 'NOTES', icon: FileText, label: 'Anotações' },
-    { id: 'FINANCE', icon: DollarSign, label: 'Finanças' },
-    { id: 'HISTORY', icon: CalendarIcon, label: 'Hist' }, 
-    { id: 'TIMER', icon: Timer, label: 'Timer' }, 
-  ];
-
-  const startOfCurrentMonth = new Date();
-  startOfCurrentMonth.setDate(1);
-  startOfCurrentMonth.setHours(0,0,0,0);
-
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
@@ -731,7 +947,6 @@ function App() {
       {/* MOBILE NAV OVERLAY */}
       {isMobileMenuOpen && (
           <div className="lg:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col justify-end animate-in fade-in slide-in-from-bottom-10 duration-200">
-             {/* Header to close */}
              <div className="absolute top-0 left-0 right-0 p-4 flex justify-end">
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-app-card rounded-full text-app-subtext hover:text-white border border-app-border">
                     <X size={24} />
@@ -762,7 +977,7 @@ function App() {
           </div>
       )}
 
-      {/* Sidebar - Desktop Only (Visible only on LG and up) */}
+      {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
         {appState.user && <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />}
         <nav className="flex-1 px-4 space-y-2 mt-8">
@@ -787,7 +1002,6 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* Header - Mobile/Tablet Only (PROFILE & AVATAR) */}
         <div className="lg:hidden">
             {appState.user && (
                 <MobileUserProfileHeader 
@@ -800,10 +1014,8 @@ function App() {
             )}
         </div>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-2 lg:p-8 space-y-4 md:space-y-8 scroll-smooth pb-20 lg:pb-8">
           
-          {/* Toast */}
           {toast && (
              <div className="fixed top-6 right-6 bg-app-card border border-app-gold text-app-gold px-4 py-3 md:px-6 md:py-4 rounded shadow-2xl z-50 animate-bounce">
                 <div className="flex items-center gap-2">
@@ -813,10 +1025,9 @@ function App() {
              </div>
           )}
 
-          {/* DASHBOARD VIEW */}
           {activeTab === 'DASHBOARD' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-              {/* Left Column: Stats & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 animate-in fade-in duration-300">
+              {/* Left Column */}
               <div className="lg:col-span-2 space-y-4 md:space-y-8">
                 
                 {/* Streak Banner */}
@@ -831,7 +1042,7 @@ function App() {
                   <Activity className="text-app-gold opacity-50 w-10 h-10 md:w-12 md:h-12" />
                 </div>
 
-                {/* Day Mode Selector */}
+                {/* Day Mode */}
                 <div className="bg-app-card p-4 md:p-6 rounded border border-app-border shadow-sm">
                   <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-3 md:mb-4 font-bold">Modo do Dia</h3>
                   <div className="grid grid-cols-3 gap-2 md:gap-4">
@@ -847,13 +1058,11 @@ function App() {
                   </div>
                 </div>
 
-                {/* Mentor Help Button */}
                 <button onClick={() => setShowMentorModal(true)} className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-3 md:p-4 rounded flex items-center justify-center gap-2 md:gap-3 transition-all group shadow-sm hover:shadow-md">
                   <div className="p-1.5 md:p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors"><Mic size={16} className="md:w-5 md:h-5 text-app-gold group-hover:scale-110 transition-transform" /></div>
                   <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Precisa de ajuda? Fale por voz com o mentor!</span>
                 </button>
 
-                {/* Today's Routines */}
                 <div>
                    <div className="flex items-center justify-between mb-3 md:mb-4">
                        <h3 className="text-base md:text-xl font-bold text-app-text">Rotinas de Hoje</h3>
@@ -899,7 +1108,7 @@ function App() {
                         {['D','S','T','Q','Q','S','S'].map((d,i) => <div key={i}>{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1">
-                        {eachDayOfInterval({ start: startOfCurrentMonth, end: endOfMonth(new Date()) }).map(day => {
+                        {eachDayOfInterval({ start: new Date(new Date().getFullYear(), new Date().getMonth(), 1), end: endOfMonth(new Date()) }).map(day => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const log = appState.dayLogs[dStr];
                             let bgClass = 'bg-app-input text-app-subtext';
@@ -911,7 +1120,7 @@ function App() {
                     </div>
                  </div>
 
-                 {/* Active Goals Summary */}
+                 {/* Active Goals */}
                  <div className="bg-app-card p-4 md:p-6 rounded border border-app-border shadow-sm">
                     <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-3 md:mb-4 font-bold">Foco Atual</h3>
                     {appState.goals.length === 0 ? <p className="text-app-subtext text-xs italic">Nenhuma meta ativa.</p> : (
@@ -932,24 +1141,10 @@ function App() {
             </div>
           )}
           
-          {/* EVOLUTION MAP TAB */}
-          {activeTab === 'EVOLUTION' && (
-             <EvolutionMap 
-                evolutionState={evolutionState}
-                onCompleteDay={handleCompleteEvolutionDay}
-                onUndoDay={handleUndoEvolutionDay}
-                onCompleteDayLevel2={handleCompleteEvolutionDayLevel2}
-                onUndoDayLevel2={handleUndoEvolutionDayLevel2}
-                onStartLevel1={handleStartLevel1}
-                onStartLevel2={handleStartLevel2}
-                onStartLevel3={handleStartLevel3}
-                onCompleteDayLevel3={handleCompleteEvolutionDayLevel3}
-             />
-          )}
-
-          {/* ROUTINES MANAGEMENT */}
+          {/* Outras Tabs (Renderização Condicional Padrão) */}
+          {activeTab === 'EVOLUTION' && <EvolutionMap evolutionState={evolutionState} onCompleteDay={handleCompleteEvolutionDay} onUndoDay={handleUndoEvolutionDay} onCompleteDayLevel2={handleCompleteEvolutionDayLevel2} onUndoDayLevel2={handleUndoEvolutionDayLevel2} onStartLevel1={handleStartLevel1} onStartLevel2={handleStartLevel2} onStartLevel3={handleStartLevel3} onCompleteDayLevel3={handleCompleteEvolutionDayLevel3} />}
           {activeTab === 'ROUTINES' && (
-             <div className="max-w-2xl mx-auto">
+             <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
                  <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Editor de Rotinas</h2>
                  <div className="bg-app-card p-4 md:p-6 rounded mb-6 md:mb-8 border border-app-border shadow-sm">
                      <form onSubmit={(e) => {
@@ -964,37 +1159,19 @@ function App() {
                      }} className="flex flex-col gap-3 md:gap-4">
                          <input name="title" placeholder="Nova rotina..." className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded focus:border-app-red outline-none" required />
                          <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-                             <select name="priority" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 <option value={Priority.HIGH}>Alta (Vermelho)</option>
-                                 <option value={Priority.MODERATE}>Moderada (Dourado)</option>
-                                 <option value={Priority.LOW}>Baixa (Cinza)</option>
-                             </select>
-                             <select name="category" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                             </select>
+                             <select name="priority" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1"><option value={Priority.HIGH}>Alta (Vermelho)</option><option value={Priority.MODERATE}>Moderada (Dourado)</option><option value={Priority.LOW}>Baixa (Cinza)</option></select>
+                             <select name="category" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">{Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}</select>
                          </div>
-                         <div>
-                            <select name="goalId" className="w-full bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none">
-                                <option value="">-- Associar a uma Meta (Opcional) --</option>
-                                {appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                            </select>
-                         </div>
+                         <div><select name="goalId" className="w-full bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none"><option value="">-- Associar a uma Meta (Opcional) --</option>{appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></div>
                          <button className="bg-app-text text-app-bg font-bold uppercase p-3 text-xs md:text-sm hover:opacity-80 transition-colors">Adicionar Rotina</button>
                      </form>
                  </div>
-                 <div className="space-y-2">
-                     <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
-                 </div>
+                 <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
              </div>
           )}
-
-          {/* GOALS TAB */}
           {activeTab === 'METAS' && (
-            <div className="max-w-4xl mx-auto">
-                <div className="flex justify-between items-center mb-4 md:mb-6">
-                    <h2 className="text-lg md:text-2xl font-bold text-app-text">Metas & Objetivos</h2>
-                    <button onClick={() => setShowGoalCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded"><Plus size={16} /> <span className="hidden md:inline">Nova Meta</span><span className="md:hidden">Nova</span></button>
-                </div>
+            <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
+                <div className="flex justify-between items-center mb-4 md:mb-6"><h2 className="text-lg md:text-2xl font-bold text-app-text">Metas & Objetivos</h2><button onClick={() => setShowGoalCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded"><Plus size={16} /> <span className="hidden md:inline">Nova Meta</span><span className="md:hidden">Nova</span></button></div>
                 <div className="grid gap-4 md:gap-8">
                     {appState.goals.map(goal => {
                         const borderColor = getPriorityBorderClass(goal.priority);
@@ -1002,55 +1179,19 @@ function App() {
                         return (
                             <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-app-border p-4 md:p-6 rounded shadow-lg relative group`}>
                                 <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
-                                    <div className="space-y-1 w-full">
-                                        <div className="flex items-start justify-between md:justify-start gap-3">
-                                            <h3 className="text-lg md:text-2xl font-bold text-app-text break-words leading-tight flex-1">{goal.title}</h3>
-                                            <div className="flex items-center gap-2 shrink-0 mt-1">
-                                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
-                                                <button onClick={(e) => deleteGoal(e, goal.id)} className="p-1 text-app-subtext hover:text-app-red transition-colors" title="Excluir Meta"><Trash2 size={16} /></button>
-                                            </div>
-                                        </div>
-                                        <p className="text-app-subtext text-xs md:text-sm max-w-xl break-words">{goal.description}</p>
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                        <span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span>
-                                        <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline}</span>
-                                    </div>
+                                    <div className="space-y-1 w-full"><div className="flex items-start justify-between md:justify-start gap-3"><h3 className="text-lg md:text-2xl font-bold text-app-text break-words leading-tight flex-1">{goal.title}</h3><div className="flex items-center gap-2 shrink-0 mt-1"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div><button onClick={(e) => deleteGoal(e, goal.id)} className="p-1 text-app-subtext hover:text-app-red transition-colors" title="Excluir Meta"><Trash2 size={16} /></button></div></div><p className="text-app-subtext text-xs md:text-sm max-w-xl break-words">{goal.description}</p></div>
+                                    <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start"><span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span><span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline.slice(5)}</span></div>
                                 </div>
-                                <div className="mb-4 md:mb-6">
-                                    <div className="flex justify-between text-[10px] md:text-xs uppercase text-app-subtext mb-1"><span>Progresso</span><span>{progress}%</span></div>
-                                    <div className="w-full bg-app-input h-1.5 md:h-2 rounded-full border border-app-border"><div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div></div>
-                                </div>
-                                <div className="bg-app-input p-3 md:p-4 rounded border border-app-border">
-                                    <h4 className="text-[10px] md:text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2"><ListTodo size={14}/> Micro Tarefas</h4>
-                                    <div className="space-y-2 mb-4">
-                                        {goal.tasks.length === 0 && <p className="text-app-subtext text-xs italic">Nenhuma micro tarefa definida.</p>}
-                                        {goal.tasks.map(task => (
-                                            <div key={task.id} className="flex items-start gap-2 md:gap-3 group py-1">
-                                                <button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>
-                                                    {task.isCompleted && <Check size={12} className="text-black"/>}
-                                                </button>
-                                                <input type="time" value={task.time} onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)} className="bg-transparent text-[10px] md:text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-14 md:w-16 text-center shrink-0 cursor-pointer mt-0.5" />
-                                                <span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span>
-                                                <button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem('taskTitle') as HTMLInputElement; if(input.value) { addTaskToGoal(goal.id, input.value); input.value = ''; } }} className="flex gap-2 border-t border-app-border pt-3">
-                                        <input name="taskTitle" placeholder="+ Tarefa" className="bg-transparent flex-1 text-xs md:text-sm text-app-text placeholder-app-subtext outline-none min-w-0" />
-                                        <button className="text-[10px] md:text-xs text-app-gold uppercase font-bold hover:text-white shrink-0"><span className="hidden md:inline">Adicionar</span><span className="md:hidden"><Plus size={16}/></span></button>
-                                    </form>
-                                </div>
+                                <div className="mb-4 md:mb-6"><div className="flex justify-between text-[10px] md:text-xs uppercase text-app-subtext mb-1"><span>Progresso</span><span>{progress}%</span></div><div className="w-full bg-app-input h-1.5 md:h-2 rounded-full border border-app-border"><div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div></div></div>
+                                <div className="bg-app-input p-3 md:p-4 rounded border border-app-border"><h4 className="text-[10px] md:text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2"><ListTodo size={14}/> Micro Tarefas</h4><div className="space-y-2 mb-4">{goal.tasks.length === 0 && <p className="text-app-subtext text-xs italic">Nenhuma micro tarefa definida.</p>}{goal.tasks.map(task => (<div key={task.id} className="flex items-start gap-2 md:gap-3 group py-1"><button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>{task.isCompleted && <Check size={12} className="text-black"/>}</button><input type="time" value={task.time} onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)} className="bg-transparent text-[10px] md:text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-14 md:w-16 text-center shrink-0 cursor-pointer mt-0.5" /><span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span><button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button></div>))}</div><form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem('taskTitle') as HTMLInputElement; if(input.value) { addTaskToGoal(goal.id, input.value); input.value = ''; } }} className="flex gap-2 border-t border-app-border pt-3"><input name="taskTitle" placeholder="+ Tarefa" className="bg-transparent flex-1 text-xs md:text-sm text-app-text placeholder-app-subtext outline-none min-w-0" /><button className="text-[10px] md:text-xs text-app-gold uppercase font-bold hover:text-white shrink-0"><span className="hidden md:inline">Adicionar</span><span className="md:hidden"><Plus size={16}/></span></button></form></div>
                             </div>
                         );
                     })}
                 </div>
             </div>
           )}
-
-          {/* HISTORY TAB */}
           {activeTab === 'HISTORY' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
                   <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Histórico de Consistência</h2>
                   <div className="bg-app-card p-4 md:p-6 rounded border border-app-border mb-6 md:mb-8 shadow-sm"><h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3><HistoryChart logs={appState.dayLogs} /></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
@@ -1059,54 +1200,18 @@ function App() {
                   </div>
               </div>
           )}
-
-          {/* NOTES TAB */}
-          {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
-
-          {/* FINANCE TAB */}
-          {activeTab === 'FINANCE' && appState.user && <div className="h-full"><FinanceManager user={appState.user} /></div>}
-
-          {/* TIMER TAB */}
-          {activeTab === 'TIMER' && <div className="flex flex-col items-center justify-center h-full"><ExecutionTimer timerState={currentTimerState} onUpdateTimer={handleUpdateTimer} /></div>}
+          {activeTab === 'NOTES' && <div className="h-full animate-in fade-in duration-300"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
+          {activeTab === 'FINANCE' && appState.user && <div className="h-full animate-in fade-in duration-300"><FinanceManager user={appState.user} /></div>}
+          {activeTab === 'TIMER' && <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-300"><ExecutionTimer timerState={currentTimerState} onUpdateTimer={handleUpdateTimer} /></div>}
 
         </div>
       </main>
 
-      {/* Bottom Navigation - Mobile/Tablet Only (Visible on LG and below) */}
+      {/* Bottom Nav Mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-app-card border-t border-app-border flex justify-around items-center z-50 pb-safe shadow-2xl safe-area-bottom transition-colors duration-[3000ms]">
-        
-        {/* Left: Quick Home */}
-        <button 
-            onClick={() => { setActiveTab('DASHBOARD'); setIsMobileMenuOpen(false); }} 
-            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'DASHBOARD' ? 'text-app-gold' : 'text-app-subtext'}`}
-        >
-            <LayoutDashboard size={20} />
-            <span className="text-[9px] font-bold uppercase mt-1">Início</span>
-        </button>
-
-        {/* Center: The Requested MENU Trigger (3 Lines) */}
-        <button 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="flex flex-col items-center justify-center w-20 h-full -mt-6"
-        >
-            <div className="bg-app-gold text-black p-4 rounded-full shadow-lg shadow-yellow-500/20 border-4 border-app-bg transform transition-transform active:scale-95">
-                <Menu size={24} strokeWidth={3} />
-            </div>
-            <span className="text-[10px] font-bold uppercase mt-1 text-app-gold">Menu</span>
-        </button>
-
-        {/* Right: Quick Timer (Focus) */}
-        <button 
-            onClick={() => { setActiveTab('TIMER'); setIsMobileMenuOpen(false); }} 
-            className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'TIMER' ? 'text-app-gold' : 'text-app-subtext'}`}
-        >
-            <div className="relative">
-                <Timer size={20} />
-                {isTimerRunning && <span className="absolute -top-1 -right-1 w-2 h-2 bg-app-red rounded-full animate-pulse"></span>}
-            </div>
-            <span className="text-[9px] font-bold uppercase mt-1">Foco</span>
-        </button>
-
+        <button onClick={() => { setActiveTab('DASHBOARD'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'DASHBOARD' ? 'text-app-gold' : 'text-app-subtext'}`}><LayoutDashboard size={20} /><span className="text-[9px] font-bold uppercase mt-1">Início</span></button>
+        <button onClick={() => setIsMobileMenuOpen(true)} className="flex flex-col items-center justify-center w-20 h-full -mt-6"><div className="bg-app-gold text-black p-4 rounded-full shadow-lg shadow-yellow-500/20 border-4 border-app-bg transform transition-transform active:scale-95"><Menu size={24} strokeWidth={3} /></div><span className="text-[10px] font-bold uppercase mt-1 text-app-gold">Menu</span></button>
+        <button onClick={() => { setActiveTab('TIMER'); setIsMobileMenuOpen(false); }} className={`flex flex-col items-center justify-center w-20 h-full ${activeTab === 'TIMER' ? 'text-app-gold' : 'text-app-subtext'}`}><div className="relative"><Timer size={20} />{isTimerRunning && <span className="absolute -top-1 -right-1 w-2 h-2 bg-app-red rounded-full animate-pulse"></span>}</div><span className="text-[9px] font-bold uppercase mt-1">Foco</span></button>
       </nav>
     </div>
   );

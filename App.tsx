@@ -34,7 +34,8 @@ import {
   DollarSign,
   Grid,
   Globe,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
@@ -51,19 +52,38 @@ import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
 
-// --- Loading Screen Component ---
-const LoadingScreen = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text animate-in fade-in duration-500">
-    <div className="relative mb-6">
-        <div className="w-16 h-16 border-4 border-app-input border-t-app-gold rounded-full animate-spin"></div>
-        <div className="absolute inset-0 flex items-center justify-center">
-            <Shield size={20} className="text-app-subtext opacity-50" />
+// --- Loading Screen Component Enhanced ---
+const LoadingScreen = ({ onCancel }: { onCancel?: () => void }) => {
+  const [showCancel, setShowCancel] = useState(false);
+
+  useEffect(() => {
+    // Se demorar mais de 6 segundos, mostra opção de cancelar/sair
+    const timer = setTimeout(() => setShowCancel(true), 6000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text animate-in fade-in duration-500 relative z-50">
+        <div className="relative mb-6">
+            <div className="w-16 h-16 border-4 border-app-input border-t-app-gold rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <Shield size={20} className="text-app-subtext opacity-50" />
+            </div>
         </div>
+        <h2 className="text-xl font-bold uppercase tracking-widest animate-pulse text-app-gold">Carregando Sistema</h2>
+        <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
+
+        {showCancel && onCancel && (
+            <button 
+                onClick={onCancel}
+                className="mt-8 flex items-center gap-2 text-app-red border border-app-red/30 px-4 py-2 rounded hover:bg-app-red/10 transition-colors text-xs uppercase font-bold"
+            >
+                <LogOut size={14} /> Demorando muito? Cancelar/Sair
+            </button>
+        )}
     </div>
-    <h2 className="text-xl font-bold uppercase tracking-widest animate-pulse text-app-gold">Carregando Sistema</h2>
-    <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
-  </div>
-);
+  );
+};
 
 // --- Subcomponents within App.tsx ---
 
@@ -311,53 +331,62 @@ function App() {
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
 
   // --- INITIAL SESSION CHECK ---
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
+    // Use a flag to avoid race conditions between checkSession and onAuthStateChange
+    let isFetching = false;
+
+    const loadData = async (user: any) => {
+        if (isFetching) return;
+        isFetching = true;
+        
+        if (mounted) {
+            setIsLoading(true);
+            setLoadingError(null);
+        }
+
         try {
-            const { data } = await supabase.auth.getSession();
-            if (data.session?.user && mounted) {
-                console.log("Sessão encontrada. Carregando dados...");
-                const state = await authService.loadUserSession(data.session.user);
-                if (mounted) setAppState(state);
+            const state = await authService.loadUserSession(user);
+            if (mounted) {
+                setAppState(state);
+                setIsLoading(false);
             }
-        } catch (e) {
-            console.error("Erro ao verificar sessão inicial:", e);
+        } catch (err: any) {
+            console.error("Erro no load:", err);
+            if (mounted) {
+                setLoadingError(err.message || "Falha ao carregar dados.");
+                setIsLoading(false); // Stop spinning even on error
+            }
         } finally {
+            isFetching = false;
+        }
+    };
+
+    // 1. Initial Check
+    const init = async () => {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+            await loadData(data.session.user);
+        } else {
             if (mounted) setIsLoading(false);
         }
     };
-    checkSession();
+    init();
 
-    // Listener para mudanças de Auth (Login Google, Logout, etc)
+    // 2. Auth Listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth Event:", event);
-        
         if (event === 'SIGNED_IN' && session?.user) {
-            if (mounted) setIsLoading(true);
-            try {
-                // Delay para garantir que o banco processou gatilhos
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                const loadedState = await authService.loadUserSession(session.user);
-                if (mounted) setAppState(loadedState);
-            } catch (err: any) {
-                console.error("Erro ao carregar dados do usuário autenticado:", err);
-                if (mounted) {
-                    setAppState(null);
-                    // IMPORTANTE: Alerta visível se houver erro de permissão
-                    alert(`Erro de Acesso: ${err.message}`);
-                }
-            } finally {
-                if (mounted) setIsLoading(false);
-            }
+            await loadData(session.user);
         } else if (event === 'SIGNED_OUT') {
             if (mounted) {
                 setAppState(null);
                 setIsLoading(false);
+                setLoadingError(null);
             }
         }
     });
@@ -401,8 +430,11 @@ function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+        await supabase.auth.signOut();
+    } catch (e) { console.error(e); }
     setAppState(null);
+    setLoadingError(null);
   };
 
   const handleToggleTheme = () => {
@@ -611,9 +643,37 @@ function App() {
 
   // --- Render ---
 
-  // LOADING STATE
-  if (isLoading) {
-      return <LoadingScreen />;
+  // LOADING & ERROR STATE
+  if (isLoading || loadingError) {
+      if (loadingError) {
+          return (
+             <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text p-8 text-center">
+                <AlertOctagon size={48} className="text-app-red mb-4" />
+                <h2 className="text-xl font-bold uppercase mb-2">Erro ao Iniciar</h2>
+                <p className="text-app-subtext mb-6">{loadingError}</p>
+                
+                {loadingError.includes("permissão") && (
+                   <div className="bg-app-card p-4 rounded border border-app-gold mb-6 text-left text-xs text-app-subtext">
+                       <strong>Atenção:</strong> Isso geralmente acontece porque o banco de dados tem regras de segurança antigas. 
+                       <br/><br/>
+                       1. Vá no Supabase > SQL Editor
+                       <br/>
+                       2. Cole o código SQL de correção
+                       <br/>
+                       3. Clique em "Run"
+                   </div>
+                )}
+
+                <button 
+                    onClick={handleLogout} 
+                    className="bg-app-text text-app-bg px-6 py-3 font-bold uppercase rounded hover:opacity-80 transition-opacity"
+                >
+                    Sair e Tentar Novamente
+                </button>
+             </div>
+          );
+      }
+      return <LoadingScreen onCancel={handleLogout} />;
   }
 
   if (!appState) {

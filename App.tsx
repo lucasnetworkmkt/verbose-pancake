@@ -335,18 +335,21 @@ function App() {
     // Listener para mudanças de Auth (Login Google, Logout, etc)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth Event:", event);
+        
         if (event === 'SIGNED_IN' && session?.user) {
             if (mounted) setIsLoading(true);
             try {
-                // Pequeno delay para garantir que o banco processou a trigger se houver
+                // Delay para garantir que o banco processou gatilhos
                 await new Promise(resolve => setTimeout(resolve, 500));
+                
                 const loadedState = await authService.loadUserSession(session.user);
                 if (mounted) setAppState(loadedState);
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Erro ao carregar dados do usuário autenticado:", err);
                 if (mounted) {
-                    setAppState(null); // Volta para login se falhar
-                    alert("Erro ao carregar seus dados. Tente fazer login novamente.");
+                    setAppState(null);
+                    // IMPORTANTE: Alerta visível se houver erro de permissão
+                    alert(`Erro de Acesso: ${err.message}`);
                 }
             } finally {
                 if (mounted) setIsLoading(false);

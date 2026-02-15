@@ -32,6 +32,15 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   }
 });
 
+// Helper de timeout para evitar chamadas infinitas
+// Updated to accept PromiseLike to handle Supabase QueryBuilder and prevent inference issues
+const withTimeout = async <T>(promise: PromiseLike<T>, ms: number = 5000): Promise<T> => {
+    return Promise.race([
+        Promise.resolve(promise),
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout na conexão com o banco de dados')), ms))
+    ]);
+};
+
 // --- SERVICES ---
 
 export const authService = {
@@ -55,20 +64,18 @@ export const authService = {
   // Carrega os dados do App baseados em uma sessão existente
   loadUserSession: async (authUser: any): Promise<AppState> => {
     console.log("Iniciando carga de dados para:", authUser.id);
-
-    // 1. Tenta buscar dados existentes
-    let { data: dbData, error: dbError } = await supabase
-      .from('app_data')
-      .select('data')
-      .eq('user_id', authUser.id)
-      .maybeSingle(); 
-
     const googleAvatar = authUser.user_metadata?.avatar_url || '';
     const googleName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0];
 
-    // 2. Se NÃO encontrou dados, precisamos descobrir se é um erro de permissão ou se o usuário é realmente novo.
+    // 1. Tenta buscar dados existentes com timeout
+    // Cast result to any to avoid TypeScript inference errors on Supabase response
+    let { data: dbData, error: dbError } = await withTimeout(
+        supabase.from('app_data').select('data').eq('user_id', authUser.id).maybeSingle()
+    ) as { data: any, error: any };
+
+    // 2. Se NÃO encontrou dados, cria novos. Sem retries complexos para evitar loop.
     if (!dbData) {
-        console.log("Dados não encontrados via Select. Tentando inicializar...");
+        console.log("Dados não encontrados. Criando nova conta...");
         
         const initialState = createInitialState();
         const newPayload = { 
@@ -79,45 +86,29 @@ export const authService = {
             } 
         };
 
-        // Tenta INSERIR. 
-        // Se falhar com conflito (23505), significa que os dados EXISTEM, mas o SELECT falhou (erro de permissão).
-        const { data: insertedData, error: insertError } = await supabase
-            .from('app_data')
-            .insert({
+        // Tenta INSERIR. Se falhar, é erro real de permissão ou conexão.
+        // Cast result to any to avoid TypeScript inference errors
+        const insertRes = await withTimeout(
+            supabase.from('app_data').insert({
                 user_id: authUser.id,
                 data: newPayload,
                 updated_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-            
-        if (insertError) {
-            if (insertError.code === '23505') { // Código Postgres para Unique Violation
-                console.warn("Conflito detectado: Usuário JÁ EXISTE no banco. O Select anterior falhou.");
-                console.log("Tentando recuperar dados novamente (Retry)...");
-                
-                // Retry do Select
-                const retry = await supabase.from('app_data').select('data').eq('user_id', authUser.id).single();
-                
-                if (retry.data) {
-                    console.log("Dados recuperados com sucesso no retry.");
-                    dbData = retry.data;
-                } else {
-                    // SE chegar aqui, é certeza que o RLS está bloqueando a leitura
-                    console.error("ERRO CRÍTICO: Dados existem mas não podem ser lidos. Verifique RLS.");
-                    throw new Error("Sua conta existe, mas o sistema não tem permissão para ler seus dados. Por favor, execute o script de correção no Supabase.");
-                }
-            } else {
-                console.error("Erro ao criar nova conta:", insertError);
-                throw new Error("Falha ao criar/acessar conta. Erro: " + insertError.message);
-            }
-        } else {
-            console.log("Nova conta criada com sucesso.");
-            dbData = insertedData;
+            }).select().single()
+        ) as { data: any, error: any };
+
+        if (insertRes.error) {
+             // Se erro for duplicação (23505), significa que os dados existem mas não conseguimos ler (RLS).
+             // Nesse caso, retornamos erro para a UI pedir correção SQL, em vez de travar.
+             if (insertRes.error.code === '23505') {
+                 console.error("Conflito: Dados existem mas não podem ser lidos (RLS).");
+                 throw new Error("Erro de permissão no banco de dados. Por favor, execute o script SQL de correção.");
+             }
+             throw new Error("Falha ao criar conta: " + insertRes.error.message);
         }
+
+        dbData = insertRes.data;
     } else {
-        console.log("Dados encontrados com sucesso.");
-        // Atualiza avatar se necessário
+        // Atualiza avatar se necessário (sem bloquear o load principal)
         const currentData = dbData.data as AppState;
         if (currentData.user && (currentData.user.avatarUrl !== googleAvatar && googleAvatar !== '')) {
              const updatedPayload = {
@@ -128,17 +119,19 @@ export const authService = {
                      username: currentData.user.username || googleName
                  }
              };
-             await supabase.from('app_data').update({
+             // Fire and forget update
+             supabase.from('app_data').update({
                  data: updatedPayload,
                  updated_at: new Date().toISOString()
-             }).eq('user_id', authUser.id);
+             }).eq('user_id', authUser.id).then(() => {});
+             
              dbData.data = updatedPayload;
         }
     }
 
     let appStateData = dbData?.data || createInitialState();
 
-    // Migrações de segurança
+    // Migrações de segurança simples
     if (appStateData.settings && !appStateData.settings.theme) {
         appStateData.settings.theme = 'dark';
     }
@@ -202,6 +195,8 @@ export const authService = {
         createdAt: Date.now()
     };
 
+    // Tenta inserir dados iniciais. Se falhar, o usuário ainda foi criado no Auth,
+    // então o loadUserSession lidará com a criação dos dados depois.
     if (authData.session) {
         await supabase.from('app_data').insert({
             user_id: authData.user.id,
@@ -222,7 +217,6 @@ export const dataService = {
 
     const { user, ...dataToSave } = state;
     
-    // Salva user dentro do JSON para persistência
     const payload = {
         ...dataToSave,
         user: { 
@@ -231,7 +225,6 @@ export const dataService = {
         } 
     };
 
-    // Upsert aqui é seguro pois estamos salvando o estado ATUAL da memória (que foi carregado corretamente)
     const { error } = await supabase
         .from('app_data')
         .upsert({

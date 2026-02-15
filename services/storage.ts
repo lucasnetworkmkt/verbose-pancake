@@ -35,6 +35,74 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
 // --- SERVICES ---
 
 export const authService = {
+  // Login via OAuth (Google)
+  loginWithGoogle: async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin, // Redireciona para a URL atual (localhost ou vercel)
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  // Carrega os dados do App baseados em uma sessão existente (usado após OAuth ou refresh)
+  loadUserSession: async (authUser: any): Promise<AppState> => {
+    // 1. Buscar dados do aplicativo no banco
+    const { data: dbData, error: dbError } = await supabase
+      .from('app_data')
+      .select('data')
+      .eq('user_id', authUser.id)
+      .single();
+
+    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 é "Row not found"
+        console.error("Erro ao buscar dados:", dbError);
+        throw new Error("Falha ao carregar seus dados.");
+    }
+
+    // Se não tiver dados salvos (primeiro login Google), cria estado inicial
+    let appStateData = dbData?.data || createInitialState();
+    
+    // Se for o primeiro acesso via Google e não tiver dados, salvamos o inicial
+    if (!dbData) {
+        const initialState = createInitialState();
+        const username = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário';
+        
+        // Salva imediatamente para garantir persistência
+        await supabase.from('app_data').insert({
+            user_id: authUser.id,
+            data: { ...initialState, user: { avatarUrl: authUser.user_metadata?.avatar_url || '', username } }
+        });
+        
+        appStateData = initialState;
+    }
+
+    // Migrações de segurança (dados legados)
+    if (appStateData.settings && !appStateData.settings.theme) {
+        appStateData.settings.theme = 'dark';
+    }
+    if (!appStateData.pdfs) {
+        appStateData.pdfs = [];
+    }
+
+    const user: User = {
+        id: authUser.id,
+        username: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.username || authUser.email?.split('@')[0],
+        email: authUser.email || '',
+        password: '', // OAuth não retorna senha
+        avatarUrl: appStateData.user?.avatarUrl || authUser.user_metadata?.avatar_url || '',
+        createdAt: new Date(authUser.created_at).getTime()
+    };
+
+    return { ...appStateData, user };
+  },
+
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação real com Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -56,44 +124,16 @@ export const authService = {
       throw new Error("Erro desconhecido ao realizar login.");
     }
 
-    // 2. Buscar dados do aplicativo no banco
-    const { data: dbData, error: dbError } = await supabase
-      .from('app_data')
-      .select('data')
-      .eq('user_id', authData.user.id)
-      .single();
-
-    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 é "Row not found"
-        console.error("Erro ao buscar dados:", dbError);
-        throw new Error("Falha ao carregar seus dados.");
+    // Reutiliza a lógica de carregar sessão
+    const state = await authService.loadUserSession(authData.user);
+    
+    // Injeta a senha apenas localmente para a UI (requisito visual legado)
+    // Nota: Isso não afeta a segurança do banco, pois é apenas no client state
+    if (state.user) {
+        state.user.password = password;
     }
 
-    // Se não tiver dados salvos, cria estado inicial
-    const appStateData = dbData?.data || createInitialState();
-    
-    // Migração de dados legados (garantir que theme exista)
-    if (appStateData.settings && !appStateData.settings.theme) {
-        appStateData.settings.theme = 'dark';
-    }
-    
-    // Migração de dados legados (garantir que pdfs exista)
-    if (!appStateData.pdfs) {
-        appStateData.pdfs = [];
-    }
-    
-    // Montar o objeto User local
-    // NOTA: 'password' é injetado aqui apenas para cumprir o requisito visual da UI. 
-    // O Supabase NÃO retorna a senha. Estamos usando a senha digitada no formulário de login.
-    const user: User = {
-        id: authData.user.id,
-        username: authData.user.user_metadata?.username || email.split('@')[0],
-        email: authData.user.email || '',
-        password: password, // Injetando a senha local para exibição
-        avatarUrl: appStateData.user?.avatarUrl || '', // Recupera avatar se existir no JSON salvo
-        createdAt: new Date(authData.user.created_at).getTime()
-    };
-
-    return { ...appStateData, user };
+    return state;
   },
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {

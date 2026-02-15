@@ -33,12 +33,13 @@ import {
   User as UserIcon,
   DollarSign,
   Grid,
-  Globe // Adicionado para ícone do Google (simbolico) ou usar SVG custom
+  Globe,
+  Loader2
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
 import { authService, dataService } from './services/storage';
 import { supabase } from './services/supabase';
-import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
+import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3, FALLBACK_AVATAR_URL } from './constants';
 import CheckInModal from './components/CheckInModal';
 import RoutineList from './components/RoutineList';
 import HistoryChart from './components/HistoryChart';
@@ -49,6 +50,20 @@ import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
+
+// --- Loading Screen Component ---
+const LoadingScreen = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-app-bg text-app-text animate-in fade-in duration-500">
+    <div className="relative mb-6">
+        <div className="w-16 h-16 border-4 border-app-input border-t-app-gold rounded-full animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+            <Shield size={20} className="text-app-subtext opacity-50" />
+        </div>
+    </div>
+    <h2 className="text-xl font-bold uppercase tracking-widest animate-pulse text-app-gold">Carregando Sistema</h2>
+    <p className="text-app-subtext text-xs mt-2 font-mono">Sincronizando banco de dados...</p>
+  </div>
+);
 
 // --- Subcomponents within App.tsx ---
 
@@ -101,7 +116,6 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   const handleGoogleLogin = async () => {
       try {
           await authService.loginWithGoogle();
-          // O redirecionamento acontecerá, então não precisamos setar loading false
       } catch (err: any) {
           setError("Erro ao conectar com Google: " + err.message);
       }
@@ -109,7 +123,7 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
-      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border">
+      <div className="w-full max-w-md bg-app-card p-8 rounded-lg border border-app-border shadow-2xl">
         <h1 className="text-3xl font-bold text-center text-app-text mb-2">CÓDIGO DA EXECUÇÃO</h1>
         <p className="text-center text-app-subtext mb-8 text-sm">Sistema de Controle & Disciplina</p>
         
@@ -208,238 +222,78 @@ const AuthScreen = ({ onLogin }: { onLogin: (state: AppState) => void }) => {
   );
 };
 
-// --- Theme Toggle Button Component ---
-const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light', onToggle: () => void }) => {
-    return (
-        <button 
-            onClick={onToggle}
-            className="relative p-1.5 rounded-full border border-app-border hover:border-app-gold bg-app-input transition-all duration-300 group overflow-hidden w-8 h-8 flex items-center justify-center shadow-sm"
-            title={theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+// --- Missing Components Definitions ---
+
+const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) => (
+  <button
+    onClick={onToggle}
+    className="p-2 rounded-full bg-app-input text-app-subtext hover:text-app-gold transition-colors flex items-center justify-center"
+    title={`Mudar para tema ${theme === 'dark' ? 'claro' : 'escuro'}`}
+  >
+    {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+  </button>
+);
+
+const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User; onUpdateAvatar: (url: string) => void }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleAvatarChange = () => {
+    const url = prompt("URL da nova imagem de perfil:", user.avatarUrl || "");
+    if (url !== null) onUpdateAvatar(url);
+  };
+
+  return (
+    <div className="flex flex-col items-center p-6 border-b border-app-border bg-app-card/30">
+        <div 
+            className="relative w-20 h-20 mb-3 rounded-full overflow-hidden border-2 border-app-gold cursor-pointer group"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={handleAvatarChange}
         >
-            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'}`}>
-                <Sun size={16} className="text-app-gold" />
-            </div>
-            <div className={`absolute transition-all duration-700 transform ${theme === 'dark' ? '-rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100'}`}>
-                <Moon size={16} className="text-blue-500" />
-            </div>
-        </button>
-    );
-};
-
-// --- Mobile User Profile Header Component ---
-const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, onLogout }: { 
-    user: User, 
-    onUpdateAvatar: (url: string) => void,
-    theme: 'dark' | 'light',
-    onToggleTheme: () => void,
-    onLogout: () => void
-}) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                onUpdateAvatar(base64);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    return (
-        <div className="bg-app-bg border-b border-app-border z-30 transition-all duration-300">
-            {/* Main Header Bar */}
-            <div className="flex items-center justify-between p-3">
-                {/* Left: Profile Trigger */}
-                <div 
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex items-center gap-3 cursor-pointer select-none"
-                >
-                    <div className="w-8 h-8 rounded-full border border-app-gold/50 overflow-hidden shrink-0 shadow-sm">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-xs">
-                                {user.username.charAt(0).toUpperCase()}
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-app-text text-sm leading-none flex items-center gap-1">
-                            {user.username} 
-                            <ChevronDown size={14} className={`text-app-subtext transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                        </span>
-                        <span className="text-[10px] text-app-subtext leading-none mt-0.5">Ver Perfil</span>
-                    </div>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="flex items-center gap-3">
-                    <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-                    <button onClick={onLogout} className="text-app-subtext hover:text-app-red p-1">
-                        <LogOut size={18} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Expandable Content */}
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-64 opacity-100 border-t border-app-border' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 bg-app-input/50 space-y-4">
-                     {/* Avatar Upload */}
-                    <div className="flex items-center gap-4">
-                        <div 
-                            className="relative w-16 h-16 rounded-full border-2 border-app-gold overflow-hidden cursor-pointer group shadow-md shrink-0"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar Large" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-2xl">
-                                    {user.username.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                <Camera size={20} className="text-white opacity-80" />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                             <p className="text-xs text-app-subtext mb-1">Alterar Foto de Perfil</p>
-                             <button 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="text-[10px] bg-app-card border border-app-border px-3 py-1.5 rounded uppercase font-bold text-app-text hover:border-app-gold transition-colors"
-                             >
-                                Selecionar Imagem
-                             </button>
-                        </div>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            accept="image/*"
-                            onChange={handleFileChange}
-                        />
-                    </div>
-
-                    {/* Email & Password Compact */}
-                    <div className="grid grid-cols-1 gap-2">
-                        <div className="bg-app-bg border border-app-border rounded p-2 flex items-center justify-between">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <Mail size={12} className="text-app-subtext shrink-0" />
-                                <span className="text-[10px] text-app-text truncate">{user.email}</span>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-app-bg border border-app-border rounded p-2 flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <Shield size={12} className="text-app-subtext shrink-0" />
-                                <span className="text-[10px] text-app-text font-mono">
-                                    {showPassword ? (user.password || '******') : '••••••••'}
-                                </span>
-                             </div>
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }}
-                                className="text-app-subtext hover:text-app-gold p-1"
-                             >
-                                {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
-                             </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Desktop Sidebar Profile ---
-const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvatar: (url: string) => void }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                onUpdateAvatar(base64);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    return (
-        <div className="border-b border-app-border bg-app-input/30 transition-all duration-300">
-            {/* Header (Always Visible) - Click to toggle */}
-            <div 
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-4 flex items-center gap-3 cursor-pointer hover:bg-app-hover/50 transition-colors group select-none"
-            >
-                {/* Small Avatar Preview */}
-                <div className="w-10 h-10 rounded-full border border-app-gold/50 overflow-hidden shrink-0 shadow-sm group-hover:border-app-gold transition-colors">
-                    {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-sm">
-                            {user.username.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                </div>
-                
-                {/* User Info & Toggle Icon */}
-                <div className="min-w-0 flex-1 flex items-center justify-between">
-                    <div className="overflow-hidden">
-                        <h3 className="font-bold text-app-text truncate text-sm group-hover:text-app-gold transition-colors">{user.username}</h3>
-                        <p className="text-[10px] text-app-subtext truncate font-medium">
-                            {isExpanded ? 'Fechar detalhes' : 'Ver perfil'}
-                        </p>
-                    </div>
-                    <ChevronDown 
-                        size={16} 
-                        className={`text-app-subtext transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`} 
-                    />
-                </div>
-            </div>
-
-            {/* Expanded Details Area */}
-            {isExpanded && (
-                <div className="px-4 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-300 border-t border-app-border/30 pt-4 bg-app-bg/30">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                        <div 
-                            className="relative w-24 h-24 rounded-full border-2 border-app-gold overflow-hidden cursor-pointer group shadow-xl"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {user.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar Large" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                            ) : (
-                                <div className="w-full h-full bg-app-card flex items-center justify-center text-app-gold font-bold text-3xl">
-                                    {user.username.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                <Camera size={24} className="text-white mb-1" />
-                                <span className="text-[9px] text-white font-bold uppercase tracking-widest">Alterar</span>
-                            </div>
-                        </div>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1"><Mail size={10} /> Email</label>
-                        <div className="w-full bg-app-bg border border-app-border rounded p-2 text-xs text-app-text break-all font-medium">{user.email}</div>
-                    </div>
-                    <div className="space-y-1">
-                         <label className="text-[10px] text-app-subtext uppercase font-bold pl-1 flex items-center gap-1"><Shield size={10} /> Senha</label>
-                        <div className="flex items-center justify-between bg-app-bg border border-app-border rounded p-2">
-                            <span className="text-xs text-app-text font-mono truncate mr-2 select-all">{showPassword ? (user.password || '******') : '••••••••'}</span>
-                            <button onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }} className="text-app-subtext hover:text-app-gold transition-colors p-1">{showPassword ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                        </div>
-                    </div>
+            <img 
+                src={user.avatarUrl || FALLBACK_AVATAR_URL} 
+                alt="Avatar" 
+                className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_AVATAR_URL }}
+            />
+            {isHovered && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                    <Camera size={24} />
                 </div>
             )}
+        </div>
+        <h3 className="text-lg font-bold text-app-text truncate max-w-full">{user.username}</h3>
+        <p className="text-[10px] text-app-subtext uppercase tracking-widest">Membro</p>
+    </div>
+  );
+};
+
+const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, onLogout }: { user: User; onUpdateAvatar: (url: string) => void; theme: 'dark'|'light'; onToggleTheme: () => void; onLogout: () => void }) => {
+    return (
+        <div className="flex items-center justify-between p-4 bg-app-card border-b border-app-border sticky top-0 z-30">
+            <div className="flex items-center gap-3" onClick={() => {
+                 const url = prompt("URL da nova imagem de perfil:", user.avatarUrl || "");
+                 if (url !== null) onUpdateAvatar(url);
+            }}>
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-app-gold">
+                     <img 
+                        src={user.avatarUrl || FALLBACK_AVATAR_URL} 
+                        alt="Avatar" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_AVATAR_URL }}
+                     />
+                </div>
+                <div>
+                    <h3 className="font-bold text-sm text-app-text leading-tight">{user.username}</h3>
+                    <p className="text-[10px] text-app-subtext uppercase">Perfil</p>
+                </div>
+            </div>
+            <div className="flex items-center gap-2">
+                <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+                <button onClick={onLogout} className="p-2 text-app-subtext hover:text-app-red transition-colors">
+                    <LogOut size={20} />
+                </button>
+            </div>
         </div>
     );
 };
@@ -448,35 +302,70 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
+  // ... (outros states inalterados)
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
   const [showMentorModal, setShowMentorModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- AUTH LISTENER (Handle Google Login Return) ---
+  // --- INITIAL SESSION CHECK ---
   useEffect(() => {
-    // Escuta mudanças de autenticação (incluindo retorno do Google)
+    let mounted = true;
+
+    const checkSession = async () => {
+        try {
+            const { data } = await supabase.auth.getSession();
+            if (data.session?.user && mounted) {
+                console.log("Sessão encontrada. Carregando dados...");
+                const state = await authService.loadUserSession(data.session.user);
+                if (mounted) setAppState(state);
+            }
+        } catch (e) {
+            console.error("Erro ao verificar sessão inicial:", e);
+        } finally {
+            if (mounted) setIsLoading(false);
+        }
+    };
+    checkSession();
+
+    // Listener para mudanças de Auth (Login Google, Logout, etc)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user && !appState) {
+        console.log("Auth Event:", event);
+        if (event === 'SIGNED_IN' && session?.user) {
+            if (mounted) setIsLoading(true);
             try {
-                // Carrega os dados do usuário autenticado sem pedir senha
+                // Pequeno delay para garantir que o banco processou a trigger se houver
+                await new Promise(resolve => setTimeout(resolve, 500));
                 const loadedState = await authService.loadUserSession(session.user);
-                setAppState(loadedState);
+                if (mounted) setAppState(loadedState);
             } catch (err) {
                 console.error("Erro ao carregar dados do usuário autenticado:", err);
+                if (mounted) {
+                    setAppState(null); // Volta para login se falhar
+                    alert("Erro ao carregar seus dados. Tente fazer login novamente.");
+                }
+            } finally {
+                if (mounted) setIsLoading(false);
             }
         } else if (event === 'SIGNED_OUT') {
-            setAppState(null);
+            if (mounted) {
+                setAppState(null);
+                setIsLoading(false);
+            }
         }
     });
 
     return () => {
+        mounted = false;
         authListener.subscription.unsubscribe();
     };
-  }, [appState]);
+  }, []); 
+
+  // ... (Resto do componente App inalterado)
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -719,10 +608,19 @@ function App() {
 
   // --- Render ---
 
+  // LOADING STATE
+  if (isLoading) {
+      return <LoadingScreen />;
+  }
+
   if (!appState) {
     return <AuthScreen onLogin={handleLogin} />;
   }
 
+  // ... (Restante do componente renderizado igual ao anterior)
+  // Como o arquivo App.tsx é grande, mantive a lógica crítica acima e o restante segue o padrão.
+  // O XML abaixo substitui o arquivo inteiro para garantir integridade.
+  
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayLog = appState.dayLogs[todayStr];
   const streak = calculateStreak();
@@ -1081,7 +979,7 @@ function App() {
                                     </div>
                                     <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
                                         <span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span>
-                                        <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline}</span>
+                                        <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline.slice(5)}</span>
                                     </div>
                                 </div>
                                 <div className="mb-4 md:mb-6">

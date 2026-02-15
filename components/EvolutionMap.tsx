@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3, COLORS } from '../constants';
 import { EvolutionState, EvolutionChallenge, EvolutionChallengeLevel3 } from '../types';
@@ -14,7 +13,6 @@ interface EvolutionMapProps {
   onStartLevel2: () => void;
   onStartLevel3: () => void;
   onCompleteDayLevel3: (day: number) => void;
-  isReadOnly?: boolean; // New Prop for Friend View
 }
 
 type ViewMode = 'SELECTION' | 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3';
@@ -28,8 +26,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   onStartLevel1,
   onStartLevel2,
   onStartLevel3,
-  onCompleteDayLevel3,
-  isReadOnly = false
+  onCompleteDayLevel3
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('SELECTION');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -57,6 +54,9 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       const start = new Date(startDateStr).getTime();
       const diff = currentTime - start;
       if (diff < 0) return 0;
+      // Day 1 unlocks at t=0. Day 2 unlocks at t=24h.
+      // So day N is unlocked if diff >= (N-1)*24h
+      // N-1 <= diff/24h -> N <= diff/24h + 1
       return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
   };
 
@@ -70,7 +70,12 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const l1Started = !!evolutionState.startDate;
   const l1TimeAllowedDay = calculateUnlockedDayByTime(evolutionState.startDate);
   const l1CompletedMax = evolutionState.completedDays.length > 0 ? Math.max(...evolutionState.completedDays) : 0;
+  // Next unlocked is the sequential day, BUT limited by time.
   const l1NextSequential = l1CompletedMax + 1; 
+  // The actual unlocked day for interaction is min(timeAllowed, sequential)
+  // BUT we render up to 40 nodes.
+  // A node is "Time Locked" if day > l1TimeAllowedDay.
+  // A node is "Sequential Locked" if day > l1NextSequential.
 
   // Level 2 Logic
   const l2Started = !!evolutionState.startDateLevel2;
@@ -111,7 +116,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       if (isLevel1Complete) {
           setViewMode('LEVEL_2');
       } else {
-          showToast("Nível Bloqueado.");
+          showToast("Conclua o Nível 1 para desbloquear.");
       }
   };
 
@@ -119,7 +124,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       if (isLevel1Complete && isLevel2Complete) {
           setViewMode('LEVEL_3');
       } else {
-          showToast("Nível Bloqueado.");
+          showToast("Conclua Nível 1 e 2 para desbloquear.");
       }
   };
 
@@ -131,30 +136,24 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
           </div>
           
           <h2 className="text-3xl font-bold text-app-text mb-2 uppercase">Iniciar Nível {level}</h2>
+          <p className="text-app-subtext mb-8 max-w-md">Este desafio funciona em tempo real. Ao iniciar, os dias serão liberados automaticamente a cada 24h. Você não poderá pular dias ou avançar manualmente.</p>
           
-          {isReadOnly ? (
-              <p className="text-app-subtext">Este usuário ainda não iniciou este nível.</p>
-          ) : (
-             <>
-                 <p className="text-app-subtext mb-8 max-w-md">Este desafio funciona em tempo real. Ao iniciar, os dias serão liberados automaticamente a cada 24h.</p>
-                 <div className="flex gap-4">
-                    <button 
-                        onClick={() => setViewMode('SELECTION')} 
-                        className="text-app-subtext hover:text-app-text px-6 py-3 uppercase font-bold text-xs tracking-widest transition-colors"
-                    >
-                        Voltar
-                    </button>
-                    <button 
-                        onClick={onStart} 
-                        className={`px-8 py-3 rounded uppercase font-bold tracking-widest text-sm text-black transition-all transform hover:scale-105 shadow-lg
-                            ${level === 3 ? 'bg-purple-600 text-white hover:bg-purple-700' : (level === 2 ? 'bg-app-red text-white hover:bg-red-700' : 'bg-app-gold hover:bg-yellow-400')}
-                        `}
-                    >
-                        Iniciar Desafio
-                    </button>
-                 </div>
-             </>
-          )}
+          <div className="flex gap-4">
+              <button 
+                onClick={() => setViewMode('SELECTION')} 
+                className="text-app-subtext hover:text-app-text px-6 py-3 uppercase font-bold text-xs tracking-widest transition-colors"
+              >
+                Voltar
+              </button>
+              <button 
+                onClick={onStart} 
+                className={`px-8 py-3 rounded uppercase font-bold tracking-widest text-sm text-black transition-all transform hover:scale-105 shadow-lg
+                    ${level === 3 ? 'bg-purple-600 text-white hover:bg-purple-700' : (level === 2 ? 'bg-app-red text-white hover:bg-red-700' : 'bg-app-gold hover:bg-yellow-400')}
+                `}
+              >
+                Iniciar Desafio
+              </button>
+          </div>
       </div>
   );
 
@@ -163,7 +162,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       return (
         <div className="flex flex-col h-full bg-app-bg p-4 md:p-8 overflow-y-auto">
             <h2 className="text-2xl font-bold mb-8 flex items-center gap-2 text-app-text">
-                <MapPin className="text-app-gold" /> {isReadOnly ? 'MAPA DA EVOLUÇÃO (VISITANTE)' : 'MAPA DA EVOLUÇÃO'}
+                <MapPin className="text-app-gold" /> MAPA DA EVOLUÇÃO
             </h2>
 
             {toastMessage && (
@@ -229,6 +228,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const isL3 = viewMode === 'LEVEL_3';
   const isL2 = viewMode === 'LEVEL_2';
   
+  // Define completion sets for quick lookup
   const completedSetL1 = new Set(evolutionState.completedDays);
   const completedSetL2 = new Set(evolutionState.completedDaysLevel2 || []);
   const completedSetL3 = new Set(level3State.completedDays || []);
@@ -260,15 +260,18 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   }
 
   const handleNodeClick = (day: number) => {
-    // In ReadOnly mode, can click anything that is completed to view details
-    if (isReadOnly) {
-        if (completedSet.has(day)) {
-            setSelectedDay(day);
-        }
-        return;
-    }
+    // Only allow clicking if day is sequential AND time allowed
+    // Or if it's already completed (to view/undo)
+    const isCompleted = completedSet.has(day);
+    const isSequential = day <= nextSequential;
+    const isTimeAllowed = day <= timeAllowedDay;
 
+    // We allow clicking 'future' days just to see the "Locked" status, 
+    // but the modal will handle the state.
+    // Actually, let's limit interaction to sequential days for clarity, 
+    // even if time locked (to show timer).
     if (day <= nextSequential) {
+        // Reset L3 checks
         setLevel3Task1Checked(false);
         setLevel3Task2Checked(false);
         setSelectedDay(day);
@@ -276,14 +279,12 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   };
 
   const handleComplete = (day: number) => {
-      if (isReadOnly) return;
       if (isL3) onCompleteDayLevel3(day);
       else if (isL2) onCompleteDayLevel2(day);
       else onCompleteDay(day);
   };
 
   const handleUndo = (day: number) => {
-      if (isReadOnly) return;
       if (isL3) return; // Strict mode L3
       else if (isL2) onUndoDayLevel2(day);
       else onUndoDay(day);
@@ -292,8 +293,10 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const selectedChallengeData = selectedDay ? challenges.find(c => c.day === selectedDay) : null;
   const isSelectedCompleted = selectedDay ? completedSet.has(selectedDay) : false;
   
+  // Interaction Rules for Modal
+  // Can interact if: It's the next sequential day AND time allows it.
   const isTimeLocked = selectedDay ? selectedDay > timeAllowedDay : false;
-  const canInteract = !isReadOnly && selectedDay === nextSequential && !isTimeLocked;
+  const canInteract = selectedDay === nextSequential && !isTimeLocked;
   
   const unlockTimeMs = selectedDay ? getUnlockTimeForDay(activeStartDate, selectedDay) : 0;
   const waitText = unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
@@ -303,8 +306,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       <div className="p-6 sticky top-0 bg-app-bg/90 backdrop-blur z-20 border-b border-app-border flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2 text-app-text">
             <MapPin className={isL3 ? "text-purple-500" : (isL2 ? "text-app-red" : "text-app-gold")} /> 
-            {isL3 ? "NÍVEL 3" : (isL2 ? "NÍVEL 2" : "NÍVEL 1")}
-            {isReadOnly && <span className="text-xs bg-app-input px-2 py-1 rounded text-app-subtext">VISITANTE</span>}
+            {isL3 ? "NÍVEL 3 - EXECUÇÃO REAL" : (isL2 ? "NÍVEL 2 - AVANÇADO" : "NÍVEL 1 - INICIANTE")}
         </h2>
         <button 
             onClick={() => setViewMode('SELECTION')}
@@ -339,32 +341,37 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                 const isCompleted = completedSet.has(day);
                 const isNextSequential = day === nextSequential;
                 
-                const nodeTimeAllowed = day <= timeAllowedDay;
-                const isActive = !isReadOnly && isNextSequential && nodeTimeAllowed;
-                const isWaiting = !isReadOnly && isNextSequential && !nodeTimeAllowed;
-                const isLocked = !isCompleted && !isActive && !isWaiting; 
+                // Visual States
+                // 1. Completed: Green
+                // 2. Active (Sequential & Time Allowed): Pulse Color
+                // 3. Time Locked (Sequential & !Time Allowed): Lock Icon + Timer
+                // 4. Future Locked (!Sequential): Grey Lock
 
-                let nodeWaitText = "";
-                if (isWaiting) {
-                    const t = getUnlockTimeForDay(activeStartDate, day);
-                    if (t) nodeWaitText = formatWaitTime(t);
-                }
+                const nodeTimeAllowed = day <= timeAllowedDay;
+                const isActive = isNextSequential && nodeTimeAllowed;
+                const isWaiting = isNextSequential && !nodeTimeAllowed;
+                const isLocked = day > nextSequential;
+
+                const nodeUnlockTime = getUnlockTimeForDay(activeStartDate, day);
+                const nodeWaitText = nodeUnlockTime ? formatWaitTime(nodeUnlockTime) : "";
 
                 return (
                     <div 
                         key={day}
                         onClick={() => handleNodeClick(day)}
-                        className={`absolute w-14 h-14 -ml-7 -mt-7 rounded-full border-4 flex items-center justify-center font-bold text-lg z-10 transition-all shadow-lg
+                        className={`absolute w-14 h-14 -ml-7 -mt-7 rounded-full border-4 flex items-center justify-center font-bold text-lg z-10 transition-all cursor-pointer hover:scale-110 shadow-lg
                             ${isCompleted 
-                                ? 'bg-app-card border-green-500 text-green-500 cursor-pointer hover:scale-110' 
+                                ? 'bg-app-card border-green-500 text-green-500' 
                                 : isActive 
-                                    ? `bg-white ${accentColor} text-black animate-pulse cursor-pointer hover:scale-110` 
-                                    : 'bg-app-input border-app-border text-app-subtext grayscale'
+                                    ? `bg-white ${accentColor} text-black animate-pulse shadow-[0_0_20px_rgba(255,255,255,0.2)]` 
+                                    : isWaiting
+                                        ? 'bg-app-card border-app-border text-app-subtext'
+                                        : 'bg-app-input border-app-border text-app-subtext grayscale'
                             }
                         `}
                         style={{ left: `${pos.x}%`, top: `${pos.y}px`, borderColor: isActive ? accentHex : undefined }}
                     >
-                        {isCompleted ? <Check size={24} /> : (isLocked ? (isReadOnly ? day : <Lock size={16} />) : (isWaiting ? <Clock size={20} /> : day))}
+                        {isCompleted ? <Check size={24} /> : (isLocked ? <Lock size={16} /> : (isWaiting ? <Clock size={20} /> : day))}
                         
                         {isActive && (
                             <div className={`absolute top-full mt-2 bg-app-card ${isL3 ? 'text-purple-500 border-purple-500' : (isL2 ? 'text-app-red border-app-red' : 'text-app-gold border-app-gold')} text-[10px] uppercase font-bold px-2 py-1 rounded border whitespace-nowrap z-20`}>
@@ -440,7 +447,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                     )}
 
                     {/* Action Button */}
-                    {!isReadOnly && canInteract ? (
+                    {canInteract ? (
                          <button
                             onClick={() => {
                                 if (isSelectedCompleted) {
@@ -461,18 +468,16 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                              {isSelectedCompleted ? 'Concluído' : (isL3 ? 'Confirmar Execução Dupla' : 'Marcar como Feito')}
                          </button>
                     ) : (
-                        !isReadOnly && (
-                            <div className="text-center p-3 text-xs opacity-50 font-bold uppercase flex flex-col items-center gap-1">
-                                {isTimeLocked ? (
-                                    <>
-                                        <Clock size={16} />
-                                        <span>Desbloqueia em {waitText}</span>
-                                    </>
-                                ) : (
-                                    <span>Dia Anterior Pendente</span>
-                                )}
-                            </div>
-                        )
+                        <div className="text-center p-3 text-xs opacity-50 font-bold uppercase flex flex-col items-center gap-1">
+                            {isTimeLocked ? (
+                                <>
+                                    <Clock size={16} />
+                                    <span>Desbloqueia em {waitText}</span>
+                                </>
+                            ) : (
+                                <span>Dia Anterior Pendente</span>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

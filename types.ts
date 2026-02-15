@@ -110,6 +110,33 @@ export interface ExecutionTimer {
   deliverable: string;
 }
 
+// --- SOCIAL TYPES ---
+
+export interface Friendship {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  friend_username?: string; // Populated by frontend
+  friend_avatar?: string;   // Populated by frontend
+}
+
+export interface ChatMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+}
+
+export interface FriendProfile {
+  user: User;
+  evolution: EvolutionState;
+  dayLogs: Record<string, DayLog>;
+}
+
 // --- EVOLUTION MAP TYPES ---
 export interface EvolutionChallenge {
   day: number;

@@ -1,13 +1,16 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Plus, Trash2, FileText, Calendar, Tag, ChevronRight, Save, Link } from 'lucide-react';
-import { Note, Category, Goal, DocumentItem } from '../types';
+import { Search, Plus, Trash2, FileText, Link, File, Save } from 'lucide-react';
+import { Note, Category, Goal, DocumentItem, PdfDocument } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DocumentLibrary from './DocumentLibrary';
+import PdfLibrary from './PdfLibrary';
 
 interface NotesManagerProps {
   notes: Note[];
   documents: DocumentItem[];
+  pdfs: PdfDocument[]; // Adicionado
   goals: Goal[];
   onAddNote: (note: Note) => void;
   onUpdateNote: (note: Note) => void;
@@ -15,15 +18,19 @@ interface NotesManagerProps {
   onAddDocument: (doc: DocumentItem) => void;
   onUpdateDocument: (doc: DocumentItem) => void;
   onDeleteDocument: (id: string) => void;
+  onAddPdf: (pdf: PdfDocument) => void;
+  onUpdatePdf: (pdf: PdfDocument) => void;
+  onDeletePdf: (id: string) => void;
 }
 
 const NotesManager: React.FC<NotesManagerProps> = ({ 
-  notes, documents, goals, 
+  notes, documents, pdfs, goals, 
   onAddNote, onUpdateNote, onDeleteNote,
-  onAddDocument, onUpdateDocument, onDeleteDocument
+  onAddDocument, onUpdateDocument, onDeleteDocument,
+  onAddPdf, onUpdatePdf, onDeletePdf
 }) => {
   // Tab Switcher State
-  const [activeTab, setActiveTab] = useState<'TEXT' | 'DOCS'>('TEXT');
+  const [activeTab, setActiveTab] = useState<'TEXT' | 'LINKS' | 'FILES'>('TEXT');
 
   // Text Notes State
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -113,29 +120,46 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   return (
     <div className="h-full flex flex-col gap-4">
         {/* Main Section Tabs */}
-        <div className="flex gap-4 border-b border-app-border pb-2">
+        <div className="flex gap-4 border-b border-app-border pb-2 overflow-x-auto">
             <button 
                 onClick={() => setActiveTab('TEXT')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'TEXT' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
+                className={`flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === 'TEXT' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
             >
                 <FileText size={16} /> Registros de Texto
             </button>
             <button 
-                onClick={() => setActiveTab('DOCS')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'DOCS' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
+                onClick={() => setActiveTab('LINKS')}
+                className={`flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === 'LINKS' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
             >
-                <Link size={16} /> Biblioteca de Documentos
+                <Link size={16} /> Biblioteca de Links
+            </button>
+            <button 
+                onClick={() => setActiveTab('FILES')}
+                className={`flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === 'FILES' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
+            >
+                <File size={16} /> Biblioteca de Arquivos
             </button>
         </div>
 
-        {activeTab === 'DOCS' ? (
+        {activeTab === 'LINKS' && (
             <DocumentLibrary 
                 documents={documents}
                 onAddDocument={onAddDocument}
                 onUpdateDocument={onUpdateDocument}
                 onDeleteDocument={onDeleteDocument}
             />
-        ) : (
+        )}
+        
+        {activeTab === 'FILES' && (
+            <PdfLibrary 
+                pdfs={pdfs}
+                onAddPdf={onAddPdf}
+                onUpdatePdf={onUpdatePdf}
+                onDeletePdf={onDeletePdf}
+            />
+        )}
+        
+        {activeTab === 'TEXT' && (
             <div className="flex flex-col md:flex-row h-[calc(100vh-190px)] gap-6">
             {/* LEFT COLUMN: LIST */}
             <div className="w-full md:w-1/3 flex flex-col gap-4">

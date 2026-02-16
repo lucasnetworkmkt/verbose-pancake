@@ -43,7 +43,8 @@ export const fileService = {
       mime_type: file.mimeType,
       data_url: file.dataUrl,
       notes: file.notes,
-      created_at: file.uploadDate
+      created_at: file.uploadDate,
+      is_favorite: file.isFavorite || false
     });
     
     if (error) {
@@ -59,7 +60,8 @@ export const fileService = {
 
   updateFile: async (file: MediaFile) => {
     const { error } = await supabase.from('user_files').update({
-      notes: file.notes
+      notes: file.notes,
+      is_favorite: file.isFavorite
     }).eq('id', file.id);
     if (error) console.error("Erro ao atualizar arquivo:", error);
   }
@@ -113,7 +115,8 @@ export const authService = {
             mimeType: f.mime_type,
             dataUrl: f.data_url,
             uploadDate: f.created_at,
-            notes: f.notes || ''
+            notes: f.notes || '',
+            isFavorite: f.is_favorite || false
         }));
     }
 

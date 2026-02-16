@@ -35,7 +35,7 @@ import {
   Grid
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile } from './types';
-import { authService, dataService } from './services/storage';
+import { authService, dataService, fileService } from './services/storage';
 import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
 import CheckInModal from './components/CheckInModal';
 import RoutineList from './components/RoutineList';
@@ -182,6 +182,7 @@ const ThemeToggle = ({ theme, onToggle }: { theme: 'dark' | 'light', onToggle: (
     );
 };
 
+// ... (MobileUserProfileHeader and UserProfileSidebar components remain unchanged - omitting to save space) ...
 // --- Mobile User Profile Header Component ---
 const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, onLogout }: { 
     user: User, 
@@ -647,10 +648,61 @@ function App() {
   const handleUpdateDocument = (updatedDoc: DocumentItem) => { setAppState(prev => { if(!prev) return null; const currentDocs = prev.documents || []; const updatedDocs = currentDocs.map(d => d.id === updatedDoc.id ? updatedDoc : d); return { ...prev, documents: updatedDocs }; }); };
   const handleDeleteDocument = (id: string) => { setAppState(prev => { if(!prev) return null; const currentDocs = prev.documents || []; const updatedDocs = currentDocs.filter(d => d.id !== id); return { ...prev, documents: updatedDocs }; }); showToast("Link excluído."); };
   
-  // Media Files (formerly PDF) handlers
-  const handleAddFile = (file: MediaFile) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; return { ...prev, files: [file, ...currentFiles] }; }); };
-  const handleUpdateFile = (updatedFile: MediaFile) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; const updatedFiles = currentFiles.map(p => p.id === updatedFile.id ? updatedFile : p); return { ...prev, files: updatedFiles }; }); };
-  const handleDeleteFile = (id: string) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; const updatedFiles = currentFiles.filter(p => p.id !== id); return { ...prev, files: updatedFiles }; }); showToast("Arquivo excluído."); };
+  // Media Files (NEW: Connected to FileService for separate table storage)
+  const handleAddFile = async (file: MediaFile) => { 
+    if (!appState?.user) return;
+    
+    // 1. Optimistic Update (Interface updates immediately)
+    setAppState(prev => { 
+        if(!prev) return null; 
+        const currentFiles = prev.files || []; 
+        return { ...prev, files: [file, ...currentFiles] }; 
+    }); 
+    
+    // 2. Background Upload to new 'user_files' table
+    try {
+        await fileService.uploadFile(appState.user.id, file);
+        showToast("Arquivo salvo no banco.");
+    } catch (error) {
+        showToast("Erro ao salvar arquivo na nuvem.");
+        console.error(error);
+    }
+  };
+
+  const handleUpdateFile = async (updatedFile: MediaFile) => { 
+    // 1. Optimistic
+    setAppState(prev => { 
+        if(!prev) return null; 
+        const currentFiles = prev.files || []; 
+        const updatedFiles = currentFiles.map(p => p.id === updatedFile.id ? updatedFile : p); 
+        return { ...prev, files: updatedFiles }; 
+    });
+    
+    // 2. Background Update
+    try {
+        await fileService.updateFile(updatedFile);
+    } catch (error) {
+        console.error(error);
+    }
+  };
+
+  const handleDeleteFile = async (id: string) => { 
+    // 1. Optimistic
+    setAppState(prev => { 
+        if(!prev) return null; 
+        const currentFiles = prev.files || []; 
+        const updatedFiles = currentFiles.filter(p => p.id !== id); 
+        return { ...prev, files: updatedFiles }; 
+    }); 
+    showToast("Arquivo excluído.");
+
+    // 2. Background Delete
+    try {
+        await fileService.deleteFile(id);
+    } catch (error) {
+        console.error(error);
+    }
+  };
 
   // --- Render ---
 

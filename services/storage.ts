@@ -40,9 +40,17 @@ export const mediaService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado.");
 
-    // 2. Definir caminho do arquivo: user_id/timestamp_nomearquivo
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    // 2. Definir caminho do arquivo SEGURO
+    // O erro 400 geralmente ocorre por caracteres inválidos no nome.
+    // Vamos garantir que o nome seja apenas alfanumérico.
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    const randomString = Math.random().toString(36).slice(2, 10);
+    const timestamp = Date.now();
+    
+    // Nome final: timestamp_random.ext (Ex: 17150000_abc123.pdf)
+    const fileName = `${timestamp}_${randomString}.${fileExt}`;
+    
+    // Caminho: user_id/nome_arquivo
     const filePath = `${user.id}/${fileName}`;
 
     // 3. Upload para o Bucket 'media'
@@ -50,11 +58,16 @@ export const mediaService = {
       .from('media')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: file.type // IMPORTANTE: Envia o tipo MIME explicitamente para evitar erros
       });
 
     if (error) {
-      console.error("Erro upload:", error);
+      console.error("Erro detalhado Supabase:", error);
+      // Tratamento para erro comum de bucket não encontrado
+      if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
+         throw new Error("Erro: O Bucket 'media' não foi encontrado. Verifique se criou com o nome exato (minúsculo) no painel do Supabase.");
+      }
       throw new Error(`Erro no upload: ${error.message}`);
     }
 

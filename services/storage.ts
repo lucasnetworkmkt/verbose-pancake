@@ -1,6 +1,6 @@
 
 import { AppState, User, MediaFile } from '../types';
-import { supabase, supabaseUrl } from './supabase';
+import { supabase } from './supabase';
 
 // Helper for initial state creation
 const createInitialState = (): Omit<AppState, 'user'> => ({
@@ -34,78 +34,10 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
 
 // --- SERVICES ---
 
-export const mediaService = {
-  uploadFile: async (file: File): Promise<{ publicUrl: string, path: string }> => {
-    // 1. Pegar usuário atual
-    const user = supabase.auth.user();
-    if (!user) throw new Error("Usuário não autenticado.");
-
-    // 2. Definir caminho do arquivo SEGURO (UUID)
-    // Usamos UUID para garantir que o nome nunca contenha caracteres inválidos
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-
-    // 3. Upload Simplificado
-    const { data, error } = await supabase.storage
-      .from('media')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type || 'application/octet-stream' // Garante Content-Type
-      });
-
-    if (error) {
-      console.error("Erro Supabase Storage:", error);
-      
-      // VERIFICAÇÃO CRÍTICA: PROJETO DEMO
-      if (supabaseUrl.includes("ulhcfwfoewdviirhupts")) {
-         throw new Error("ERRO DE CONFIGURAÇÃO: Você está usando o banco de dados de DEMONSTRAÇÃO padrão, que não permite uploads de arquivos.\n\nSOLUÇÃO: Crie seu próprio projeto no Supabase, crie um bucket chamado 'media' e configure as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.");
-      }
-
-      // Tratamento de erros comuns
-      if (error.statusCode === '400' || error.message.includes("400")) {
-         throw new Error("Erro 400 (Bad Request). Causas prováveis:\n1. O bucket 'media' não existe no seu projeto.\n2. O arquivo é 0 bytes ou corrompido.\n3. O bucket não é Público.");
-      }
-      if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
-         throw new Error("Erro: Bucket 'media' não encontrado. Vá no painel do Supabase > Storage e crie um bucket PÚBLICO chamado 'media'.");
-      }
-      if (error.message.includes("Payload too large")) {
-         throw new Error("O arquivo é maior que o limite permitido pelo Supabase.");
-      }
-      
-      throw new Error(`Falha no upload: ${error.message}`);
-    }
-
-    // 4. Obter URL pública
-    // Note: In v1, data might have Key. Assuming path is available or handling implicitly.
-    const path = (data as any).path || (data as any).Key;
-    const { data: publicData } = supabase.storage
-      .from('media')
-      .getPublicUrl(path);
-
-    return {
-      publicUrl: publicData.publicUrl,
-      path: path
-    };
-  },
-
-  deleteFile: async (path: string) => {
-    const { error } = await supabase.storage
-      .from('media')
-      .remove([path]);
-
-    if (error) {
-      console.error("Erro ao deletar arquivo:", error);
-      throw new Error("Falha ao remover arquivo do armazenamento.");
-    }
-  }
-};
-
 export const authService = {
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação real com Supabase
-    const { user: authUser, error: authError } = await supabase.auth.signIn({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
@@ -120,7 +52,7 @@ export const authService = {
       throw new Error(authError.message);
     }
 
-    if (!authUser) {
+    if (!authData.user) {
       throw new Error("Erro desconhecido ao realizar login.");
     }
 
@@ -128,7 +60,7 @@ export const authService = {
     const { data: dbData, error: dbError } = await supabase
       .from('app_data')
       .select('data')
-      .eq('user_id', authUser.id)
+      .eq('user_id', authData.user.id)
       .single();
 
     if (dbError && dbError.code !== 'PGRST116') { 
@@ -160,12 +92,12 @@ export const authService = {
     
     // Montar o objeto User local
     const user: User = {
-        id: authUser.id,
-        username: authUser.user_metadata?.username || email.split('@')[0],
-        email: authUser.email || '',
+        id: authData.user.id,
+        username: authData.user.user_metadata?.username || email.split('@')[0],
+        email: authData.user.email || '',
         password: password, 
         avatarUrl: appStateData.user?.avatarUrl || '', 
-        createdAt: new Date(authUser.created_at).getTime()
+        createdAt: new Date(authData.user.created_at).getTime()
     };
 
     return { ...appStateData, user };
@@ -173,10 +105,13 @@ export const authService = {
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {
     // 1. Criar usuário no Auth do Supabase
-    const { user: authUser, session, error: authError } = await supabase.auth.signUp(
-      { email, password },
-      { data: { username } }
-    );
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username }
+      }
+    });
 
     if (authError) {
        console.error("Erro Supabase:", authError);
@@ -192,7 +127,7 @@ export const authService = {
        throw new Error(authError.message);
     }
 
-    if (!authUser) {
+    if (!authData.user) {
         throw new Error("Erro ao iniciar registro.");
     }
 
@@ -200,7 +135,7 @@ export const authService = {
     const initialState = createInitialState();
     
     const user: User = {
-        id: authUser.id,
+        id: authData.user.id,
         username: username,
         email: email,
         password: password,
@@ -209,11 +144,11 @@ export const authService = {
     };
 
     // 3. Salvar estado inicial
-    if (session) {
+    if (authData.session) {
         const { error: dbError } = await supabase
             .from('app_data')
             .insert({
-                user_id: authUser.id,
+                user_id: authData.user.id,
                 data: { ...initialState, user: { avatarUrl: '', username: username } } 
             });
 
@@ -230,10 +165,14 @@ export const authService = {
 
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
-    const session = supabase.auth.session();
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     const { user, ...dataToSave } = state;
+    
+    // Remove campo legado 'pdfs' para limpar o banco gradualmente se desejado,
+    // ou mantém se a interface ainda o exigir (no caso removemos do objeto salvo)
+    // delete (dataToSave as any).pdfs;
 
     const payload = {
         ...dataToSave,

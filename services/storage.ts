@@ -40,49 +40,46 @@ export const mediaService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado.");
 
-    // 2. Definir caminho do arquivo SUPER SEGURO
-    // Remove qualquer caractere que não seja letra ou número da extensão
-    const rawExt = file.name.split('.').pop() || 'bin';
-    const fileExt = rawExt.replace(/[^a-z0-9]/gi, '').toLowerCase(); 
-    
-    const randomString = Math.random().toString(36).slice(2, 10);
+    // 2. Sanitizar Nome (CRÍTICO PARA EVITAR ERRO 400)
+    // Remove tudo que não for alfanumérico para garantir aceitação do Supabase
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    // Pega apenas letras e numeros do nome original, limita a 15 chars
+    const cleanName = file.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 15);
     const timestamp = Date.now();
     
-    // Nome final: timestamp_random.ext (Ex: 17150000_abc123.pdf)
-    const fileName = `${timestamp}_${randomString}.${fileExt}`;
+    // Nome final seguro: timestamp_nome.ext
+    const fileName = `${timestamp}_${cleanName}.${fileExt}`;
     
-    // Caminho: user_id/nome_arquivo (Sem barra inicial)
+    // Caminho: user_id/nome_arquivo
     const filePath = `${user.id}/${fileName}`;
 
-    // 3. CONVERTER PARA ARRAYBUFFER (CORREÇÃO DO ERRO 400)
-    // Enviar o objeto File diretamente às vezes causa erro de boundary no multipart form data
-    const fileBuffer = await file.arrayBuffer();
-
-    // 4. Upload para o Bucket 'media'
+    // 3. Upload Simplificado (Padrão)
+    // Removemos 'duplex' e conversão de buffer que podem causar erro 400 em alguns ambientes
     const { data, error } = await supabase.storage
       .from('media')
-      .upload(filePath, fileBuffer, {
+      .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true, // Força sobrescrita se houver conflito de nome (improvável)
-        contentType: file.type, // IMPORTANTE: Tipo MIME original
-        duplex: 'half' // Necessário para alguns navegadores em uploads grandes
-      } as any);
+        upsert: false
+      });
 
     if (error) {
-      console.error("Erro detalhado Supabase:", error);
+      console.error("Erro Supabase Storage:", error);
       
-      // Tratamento específico de erros comuns
-      if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
-         throw new Error("Erro: O Bucket 'media' não existe. Crie um bucket público chamado 'media' no painel do Supabase.");
-      }
+      // Tratamento de erros comuns
       if (error.statusCode === '400' || error.message.includes("400")) {
-         throw new Error("Erro 400: O Supabase rejeitou o arquivo. Verifique se o bucket 'media' está criado e se é Público.");
+         throw new Error("Erro 400 (Bad Request). Verifique:\n1. Se o bucket 'media' existe no Supabase.\n2. Se o bucket está configurado como PÚBLICO.\n3. Se o arquivo respeita o limite de tamanho do bucket (50MB).");
+      }
+      if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
+         throw new Error("Erro: Bucket 'media' não encontrado. Crie um bucket PÚBLICO chamado 'media' no painel do Supabase.");
+      }
+      if (error.message.includes("Payload too large")) {
+         throw new Error("O arquivo é maior que o limite permitido pelo Supabase (verifique a configuração do Bucket).");
       }
       
-      throw new Error(`Erro no upload: ${error.message}`);
+      throw new Error(`Falha no upload: ${error.message}`);
     }
 
-    // 5. Obter URL pública
+    // 4. Obter URL pública
     const { data: publicData } = supabase.storage
       .from('media')
       .getPublicUrl(data.path);

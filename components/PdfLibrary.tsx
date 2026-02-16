@@ -1,9 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, Trash2, FileText, Download, File, Search, Video, Music, PlayCircle } from 'lucide-react';
+import { Upload, Trash2, FileText, Download, File, Search, Video, Music, Loader2 } from 'lucide-react';
 import { MediaFile, MediaType } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { mediaService } from '../services/storage';
 
 interface MediaLibraryProps {
   files: MediaFile[]; // Interface renomeada para genericidade
@@ -31,7 +32,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
       return 'PDF';
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -51,38 +52,42 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
       return;
     }
 
-    // Limit Size (7MB to prevent browser crash on LocalStorage/JSON handling)
-    if (file.size > 7 * 1024 * 1024) { 
-      alert("Arquivo muito grande. Limite de 7MB para salvar no sistema.");
+    // Limit Size (5GB = 5 * 1024 * 1024 * 1024 bytes)
+    const MAX_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) { 
+      alert("Arquivo muito grande. Limite de 5GB.");
       return;
     }
 
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      const type = getFileType(file.type);
-      
-      const newFile: MediaFile = {
-        id: crypto.randomUUID(),
-        fileName: file.name,
-        fileType: type,
-        mimeType: file.type,
-        dataUrl: base64,
-        uploadDate: new Date().toISOString(),
-        notes: ''
-      };
-      
-      onAddFile(newFile);
-      setIsUploading(false);
-      setSelectedFileId(newFile.id);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.onerror = () => {
-      alert("Erro ao ler arquivo.");
-      setIsUploading(false);
-    };
-    reader.readAsDataURL(file);
+    try {
+        setIsUploading(true);
+        
+        // Upload to Supabase Storage Bucket 'media'
+        const { publicUrl, path } = await mediaService.uploadFile(file);
+        
+        const type = getFileType(file.type);
+        
+        const newFile: MediaFile = {
+            id: crypto.randomUUID(),
+            fileName: file.name,
+            fileType: type,
+            mimeType: file.type,
+            dataUrl: publicUrl, // Salva URL remota, não Base64
+            storagePath: path,  // Salva caminho para deletar depois
+            uploadDate: new Date().toISOString(),
+            notes: ''
+        };
+        
+        onAddFile(newFile);
+        setSelectedFileId(newFile.id);
+        
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+    } catch (error: any) {
+        alert(error.message || "Erro no upload.");
+    } finally {
+        setIsUploading(false);
+    }
   };
 
   const handleNotesChange = (text: string) => {
@@ -91,10 +96,22 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
     }
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, file: MediaFile) => {
     e.stopPropagation();
-    onDeleteFile(id);
-    if (selectedFileId === id) setSelectedFileId(null);
+    if(!confirm("Excluir arquivo permanentemente?")) return;
+
+    try {
+        // Se tiver storagePath, deleta do bucket também
+        if (file.storagePath) {
+            await mediaService.deleteFile(file.storagePath);
+        }
+        
+        onDeleteFile(file.id);
+        if (selectedFileId === file.id) setSelectedFileId(null);
+    } catch (error) {
+        alert("Erro ao excluir arquivo.");
+        console.error(error);
+    }
   };
 
   const getFileIcon = (type: MediaType) => {
@@ -121,13 +138,23 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="w-full bg-app-card border border-dashed border-app-subtext hover:border-app-gold text-app-subtext hover:text-app-text p-6 rounded flex flex-col items-center justify-center transition-all group"
+            className={`w-full bg-app-card border border-dashed ${isUploading ? 'border-app-gold cursor-wait' : 'border-app-subtext hover:border-app-gold'} text-app-subtext hover:text-app-text p-6 rounded flex flex-col items-center justify-center transition-all group`}
           >
-            <Upload size={24} className="mb-2 group-hover:text-app-gold" />
-            <span className="uppercase text-xs font-bold tracking-widest">
-              {isUploading ? 'Processando...' : 'Adicionar Arquivo'}
-            </span>
-            <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3</span>
+            {isUploading ? (
+                <>
+                    <Loader2 size={24} className="mb-2 text-app-gold animate-spin" />
+                    <span className="uppercase text-xs font-bold tracking-widest text-app-gold">Enviando para nuvem...</span>
+                    <span className="text-[9px] text-app-subtext mt-1">Isso pode levar alguns minutos</span>
+                </>
+            ) : (
+                <>
+                    <Upload size={24} className="mb-2 group-hover:text-app-gold" />
+                    <span className="uppercase text-xs font-bold tracking-widest">
+                    Adicionar Arquivo
+                    </span>
+                    <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3 (Até 5GB)</span>
+                </>
+            )}
           </button>
 
           <div className="relative">
@@ -162,7 +189,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                     <span className="text-[10px] text-app-subtext">{format(new Date(file.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
-                    onClick={(e) => handleDelete(e, file.id)}
+                    onClick={(e) => handleDelete(e, file)}
                     className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
                  >
                     <Trash2 size={16} />
@@ -188,8 +215,8 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                     {getFileIcon(selectedFile.fileType)}
                     <h2 className="text-sm font-bold text-app-text truncate max-w-[200px] md:max-w-md">{selectedFile.fileName}</h2>
                  </div>
-                 <a href={selectedFile.dataUrl} download={selectedFile.fileName} className="text-xs text-app-gold hover:underline flex items-center gap-1">
-                    <Download size={12}/> Baixar
+                 <a href={selectedFile.dataUrl} download={selectedFile.fileName} target="_blank" rel="noopener noreferrer" className="text-xs text-app-gold hover:underline flex items-center gap-1">
+                    <Download size={12}/> Abrir/Baixar Original
                  </a>
               </div>
 
@@ -225,8 +252,11 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                             type="application/pdf" 
                             className="w-full h-full block"
                         >
-                            <div className="flex items-center justify-center h-full text-center p-6 text-white">
-                                <p className="text-sm">Pré-visualização indisponível.<br/>Use o botão Baixar.</p>
+                            <div className="flex items-center justify-center h-full text-center p-6 text-white bg-gray-900">
+                                <div className="text-center">
+                                    <p className="text-sm mb-4">Visualizador nativo indisponível.</p>
+                                    <a href={selectedFile.dataUrl} target="_blank" className="bg-app-gold text-black px-4 py-2 rounded font-bold uppercase text-xs">Abrir PDF</a>
+                                </div>
                             </div>
                         </object>
                     )}

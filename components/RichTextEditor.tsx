@@ -65,6 +65,42 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
     handleInput();
   };
 
+  // Lógica inteligente para aumentar/diminuir fonte gradualmente na escala 1-7
+  const handleFontSize = (e: React.MouseEvent, delta: number) => {
+    e.preventDefault();
+    restoreSelection();
+
+    // Tenta descobrir o tamanho atual.
+    // O browser pode retornar "3" (escala) ou "16px" (computado).
+    const queryVal = document.queryCommandValue('FontSize');
+    let currentSize = 3; // Default (16px)
+
+    if (queryVal) {
+        if (/^[1-7]$/.test(queryVal)) {
+            // Se já retornou na escala 1-7
+            currentSize = parseInt(queryVal);
+        } else {
+            // Se retornou pixels, mapeamos para a nossa escala customizada (ver CSS abaixo)
+            const pxVal = parseInt(queryVal);
+            if (!isNaN(pxVal)) {
+                if (pxVal <= 11) currentSize = 1;      // ~10px
+                else if (pxVal <= 13) currentSize = 2; // ~13px
+                else if (pxVal <= 16) currentSize = 3; // ~16px (Normal)
+                else if (pxVal <= 18) currentSize = 4; // ~18px
+                else if (pxVal <= 21) currentSize = 5; // ~21px
+                else if (pxVal <= 24) currentSize = 6; // ~24px
+                else currentSize = 7;                  // ~28px+
+            }
+        }
+    }
+
+    let newSize = currentSize + delta;
+    if (newSize < 1) newSize = 1;
+    if (newSize > 7) newSize = 7;
+
+    execCmd('fontSize', newSize.toString());
+  };
+
   // Previne que o botão roube o foco ao ser clicado (usa onMouseDown em vez de onClick)
   const handleMouseDown = (e: React.MouseEvent, command: string, value?: string) => {
     e.preventDefault(); // CRUCIAL: Impede perda de foco
@@ -72,8 +108,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
   };
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Para o input de cor, o foco já foi perdido para abrir a janela de cor
-      // Então precisamos restaurar explicitamente
       restoreSelection();
       execCmd('foreColor', e.target.value);
   };
@@ -92,29 +126,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
 
         <div className="h-4 w-[1px] bg-app-border mx-1"></div>
 
-        {/* Tamanhos de Fonte: 1=10px, 2=13px, 3=16px, 4=18px, 5=24px, 6=32px, 7=48px */}
+        {/* Botões de Fonte Gradual */}
         <button 
-          onMouseDown={(e) => handleMouseDown(e, 'fontSize', '2')} 
-          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text"
+          onMouseDown={(e) => handleFontSize(e, -1)} 
+          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1"
           title="Diminuir Fonte"
         >
-            <Minus size={16} />
+            <Minus size={14} /> <span className="text-[10px] font-bold">A</span>
         </button>
 
         <button 
-          onMouseDown={(e) => handleMouseDown(e, 'fontSize', '3')} // Padrão
+          onMouseDown={(e) => handleFontSize(e, 0)} // Reseta para 3 (Normal)
+          onClick={() => execCmd('fontSize', '3')}
           className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text"
-          title="Tamanho Normal"
+          title="Tamanho Normal (16px)"
         >
             <Type size={16} />
         </button>
 
         <button 
-          onMouseDown={(e) => handleMouseDown(e, 'fontSize', '5')} 
-          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text"
+          onMouseDown={(e) => handleFontSize(e, 1)} 
+          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1"
           title="Aumentar Fonte"
         >
-            <Plus size={16} />
+            <Plus size={14} /> <span className="text-xs font-bold">A</span>
         </button>
         
         <div className="h-4 w-[1px] bg-app-border mx-1"></div>
@@ -124,12 +159,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
             <input 
                 type="color" 
                 onChange={handleColorChange}
-                // Importante: restaurar seleção ao clicar no input para garantir que temos o range salvo
                 onClick={() => restoreSelection()} 
                 className="w-8 h-8 opacity-0 cursor-pointer absolute left-0 top-0 z-20"
             />
              <div className="w-8 h-8 rounded hover:bg-app-hover flex items-center justify-center bg-transparent border border-transparent hover:border-app-border">
-                 {/* Visual Wrapper */}
              </div>
         </div>
       </div>
@@ -139,9 +172,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         ref={editorRef}
         contentEditable
         onInput={handleInput}
-        onMouseUp={saveSelection} // Salva seleção ao soltar o mouse
-        onKeyUp={saveSelection}   // Salva seleção ao navegar com teclado
-        onBlur={saveSelection}    // Salva seleção ao sair (para o color picker funcionar)
+        onMouseUp={saveSelection}
+        onKeyUp={saveSelection}
+        onBlur={saveSelection}
         className="flex-1 p-4 bg-app-card text-app-text outline-none overflow-y-auto text-sm md:text-base leading-relaxed rich-editor-content"
         style={{ minHeight: '150px' }}
       ></div>
@@ -163,14 +196,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
             text-decoration: underline !important; 
         }
 
-        /* CORREÇÃO DE TAMANHOS DE FONTE (execCommand usa font size=1..7) */
-        .rich-editor-content font[size="1"] { font-size: 0.75rem !important; } /* 12px */
-        .rich-editor-content font[size="2"] { font-size: 0.875rem !important; } /* 14px */
-        .rich-editor-content font[size="3"] { font-size: 1rem !important; }      /* 16px */
-        .rich-editor-content font[size="4"] { font-size: 1.25rem !important; }   /* 20px */
-        .rich-editor-content font[size="5"] { font-size: 1.5rem !important; }    /* 24px */
-        .rich-editor-content font[size="6"] { font-size: 2rem !important; }      /* 32px */
-        .rich-editor-content font[size="7"] { font-size: 3rem !important; }      /* 48px */
+        /* 
+           REMAPEAMENTO DA ESCALA 1-7 PARA PIXELS SUAVES 
+           (Evita saltos gigantes como 16px -> 32px)
+        */
+        .rich-editor-content font[size="1"] { font-size: 10px !important; }
+        .rich-editor-content font[size="2"] { font-size: 13px !important; }
+        .rich-editor-content font[size="3"] { font-size: 16px !important; } /* Padrão */
+        .rich-editor-content font[size="4"] { font-size: 18px !important; } /* Aumento suave */
+        .rich-editor-content font[size="5"] { font-size: 21px !important; }
+        .rich-editor-content font[size="6"] { font-size: 24px !important; }
+        .rich-editor-content font[size="7"] { font-size: 28px !important; }
 
         .rich-editor-content[contenteditable]:empty::before {
             content: "${placeholder || ''}";

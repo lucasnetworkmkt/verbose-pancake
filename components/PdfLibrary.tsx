@@ -43,7 +43,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
         'video/webm', 
         'audio/mpeg', 
         'audio/mp3', 
-        'audio/wav',
+        'audio/wav', 
         'audio/x-m4a'
     ];
     
@@ -52,10 +52,10 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
       return;
     }
 
-    // Limit Size (5GB = 5 * 1024 * 1024 * 1024 bytes)
-    const MAX_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
+    // Limit Size (50MB = 50 * 1024 * 1024 bytes)
+    const MAX_SIZE_BYTES = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE_BYTES) { 
-      alert("Arquivo muito grande. Limite de 5GB.");
+      alert("Arquivo muito grande. Limite de 50MB.");
       return;
     }
 
@@ -152,7 +152,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                     <span className="uppercase text-xs font-bold tracking-widest">
                     Adicionar Arquivo
                     </span>
-                    <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3 (Até 5GB)</span>
+                    <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3 (Até 50MB)</span>
                 </>
             )}
           </button>

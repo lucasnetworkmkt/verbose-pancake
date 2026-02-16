@@ -93,8 +93,7 @@ export interface MediaFile {
   fileName: string;
   fileType: MediaType;
   mimeType: string;
-  dataUrl: string; // Agora armazena a URL Pública do Supabase
-  storagePath?: string; // Novo: Caminho interno no bucket para permitir exclusão
+  dataUrl: string;
   uploadDate: string;
   notes: string;
 }

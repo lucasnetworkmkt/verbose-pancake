@@ -177,35 +177,42 @@ export const authService = {
   }
 };
 
+let saveTimeout: any = null;
+
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    // Debounce: Cancela salvamento anterior se um novo for solicitado em menos de 2s
+    if (saveTimeout) clearTimeout(saveTimeout);
 
-    // CRUCIAL: Removemos 'files' e 'user' do JSON principal para salvar
-    // Files agora vão para tabela user_files (salvos individualmente no momento do upload)
-    // User info básica fica no JSON para persistir avatar/username, mas senha não precisa ir pro JSON
-    const { user, files, ...dataToSave } = state;
-    
-    // Removemos também o campo legado pdfs se existir
-    delete (dataToSave as any).pdfs;
+    saveTimeout = setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-    const payload = {
-        ...dataToSave,
-        user: { 
-            avatarUrl: user?.avatarUrl,
-            username: user?.username 
-        } 
-    };
+        // CRUCIAL: Removemos 'files' e 'user' do JSON principal para salvar
+        // Files agora vão para tabela user_files (salvos individualmente no momento do upload)
+        // User info básica fica no JSON para persistir avatar/username, mas senha não precisa ir pro JSON
+        const { user, files, ...dataToSave } = state;
+        
+        // Removemos também o campo legado pdfs se existir
+        delete (dataToSave as any).pdfs;
 
-    const { error } = await supabase
-        .from('app_data')
-        .upsert({
-            user_id: userId,
-            data: payload,
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
+        const payload = {
+            ...dataToSave,
+            user: { 
+                avatarUrl: user?.avatarUrl,
+                username: user?.username 
+            } 
+        };
 
-    if (error) console.error("Erro ao sincronizar App Data:", error.message);
+        const { error } = await supabase
+            .from('app_data')
+            .upsert({
+                user_id: userId,
+                data: payload,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+
+        if (error) console.error("Erro ao sincronizar App Data:", error.message);
+    }, 2000); // 2 segundos de espera
   }
 };

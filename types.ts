@@ -86,13 +86,20 @@ export interface DocumentItem {
   notes: string;
 }
 
-export interface PdfDocument {
+export type MediaType = 'PDF' | 'VIDEO' | 'AUDIO';
+
+export interface MediaFile {
   id: string;
   fileName: string;
+  fileType: MediaType;
+  mimeType: string;
   dataUrl: string;
   uploadDate: string;
   notes: string;
 }
+
+// Mantido apenas para compatibilidade de tipos legados temporária, se necessário
+export type PdfDocument = MediaFile; 
 
 export interface Transaction {
   id: string;
@@ -100,7 +107,7 @@ export interface Transaction {
   type: 'ganho' | 'despesa';
   amount: number;
   description: string;
-  category?: string; // Campo opcional para suportar registros antigos
+  category?: string;
   created_at: string;
 }
 
@@ -108,7 +115,7 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  password?: string; // Armazenamento local temporário para visualização (UI requirement)
+  password?: string;
   avatarUrl?: string;
   createdAt: number;
 }
@@ -128,7 +135,6 @@ export interface EvolutionChallenge {
   execution: string;
 }
 
-// Nível 3 tem estrutura diferente (Tarefa dupla)
 export interface EvolutionChallengeLevel3 {
   day: number;
   title: string;
@@ -140,19 +146,19 @@ export interface EvolutionChallengeLevel3 {
 
 export interface Level3State {
   isStarted: boolean;
-  startDate: string | null; // ISO Date
-  lastCompletionDate: string | null; // ISO Date do último dia completado
+  startDate: string | null;
+  lastCompletionDate: string | null;
   completedDays: number[];
 }
 
 export interface EvolutionState {
-  completedDays: number[]; // Array of day numbers Level 1
-  startDate?: string | null; // Data de início Nível 1
+  completedDays: number[];
+  startDate?: string | null;
   
-  completedDaysLevel2?: number[]; // Array of day numbers Level 2
-  startDateLevel2?: string | null; // Data de início Nível 2
+  completedDaysLevel2?: number[];
+  startDateLevel2?: string | null;
 
-  level3?: Level3State; // New Field for Level 3
+  level3?: Level3State;
 }
 
 export interface AppState {
@@ -161,7 +167,7 @@ export interface AppState {
   routines: Routine[];
   notes: Note[]; 
   documents: DocumentItem[];
-  pdfs: PdfDocument[]; // Adicionado campo para arquivos
+  files: MediaFile[]; // Renomeado de pdfs para files
   dayLogs: Record<string, DayLog>;
   lastCheckIn: string | null;
   settings: {
@@ -171,4 +177,7 @@ export interface AppState {
   };
   timer?: ExecutionTimer;
   evolution?: EvolutionState;
+  
+  // Campo legado opcional para evitar erros na migração imediata
+  pdfs?: MediaFile[]; 
 }

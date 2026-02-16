@@ -1,5 +1,5 @@
 
-import { AppState, User } from '../types';
+import { AppState, User, MediaFile } from '../types';
 import { supabase } from './supabase';
 
 // Helper for initial state creation
@@ -8,7 +8,7 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   routines: [],
   notes: [],
   documents: [],
-  pdfs: [], // Inicializa array de arquivos
+  files: [], // Inicializa array de arquivos genérico
   dayLogs: {},
   lastCheckIn: null,
   settings: { silentMode: false, validDayThreshold: 0.7, theme: 'dark' },
@@ -63,7 +63,7 @@ export const authService = {
       .eq('user_id', authData.user.id)
       .single();
 
-    if (dbError && dbError.code !== 'PGRST116') { // PGRST116 é "Row not found"
+    if (dbError && dbError.code !== 'PGRST116') { 
         console.error("Erro ao buscar dados:", dbError);
         throw new Error("Falha ao carregar seus dados.");
     }
@@ -71,25 +71,32 @@ export const authService = {
     // Se não tiver dados salvos, cria estado inicial
     const appStateData = dbData?.data || createInitialState();
     
-    // Migração de dados legados (garantir que theme exista)
+    // Migração de dados legados (Theme)
     if (appStateData.settings && !appStateData.settings.theme) {
         appStateData.settings.theme = 'dark';
     }
     
-    // Migração de dados legados (garantir que pdfs exista)
-    if (!appStateData.pdfs) {
-        appStateData.pdfs = [];
+    // Migração de dados legados (PDFs -> Files)
+    if (!appStateData.files) {
+        // Se existia 'pdfs', migra para 'files'
+        if (appStateData.pdfs && Array.isArray(appStateData.pdfs)) {
+             appStateData.files = appStateData.pdfs.map((p: any) => ({
+                 ...p,
+                 fileType: 'PDF', // Assume PDF para dados antigos
+                 mimeType: 'application/pdf'
+             }));
+        } else {
+             appStateData.files = [];
+        }
     }
     
     // Montar o objeto User local
-    // NOTA: 'password' é injetado aqui apenas para cumprir o requisito visual da UI. 
-    // O Supabase NÃO retorna a senha. Estamos usando a senha digitada no formulário de login.
     const user: User = {
         id: authData.user.id,
         username: authData.user.user_metadata?.username || email.split('@')[0],
         email: authData.user.email || '',
-        password: password, // Injetando a senha local para exibição
-        avatarUrl: appStateData.user?.avatarUrl || '', // Recupera avatar se existir no JSON salvo
+        password: password, 
+        avatarUrl: appStateData.user?.avatarUrl || '', 
         createdAt: new Date(authData.user.created_at).getTime()
     };
 
@@ -102,13 +109,12 @@ export const authService = {
       email,
       password,
       options: {
-        data: { username } // Salva o username nos metadados
+        data: { username }
       }
     });
 
     if (authError) {
        console.error("Erro Supabase:", authError);
-       
        if (authError.message.includes("rate limit")) {
          throw new Error("Limite de emails excedido (Supabase).\n\nSOLUÇÃO: Vá no painel Supabase > Authentication > Providers > Email e DESATIVE 'Confirm email'.");
        }
@@ -118,7 +124,6 @@ export const authService = {
        if (authError.message.includes("Password should be")) {
          throw new Error("A senha deve ter pelo menos 6 caracteres.");
        }
-       
        throw new Error(authError.message);
     }
 
@@ -133,12 +138,12 @@ export const authService = {
         id: authData.user.id,
         username: username,
         email: email,
-        password: password, // Injetando a senha local
+        password: password,
         avatarUrl: '',
         createdAt: Date.now()
     };
 
-    // 3. Salvar estado inicial APENAS se houver sessão ativa
+    // 3. Salvar estado inicial
     if (authData.session) {
         const { error: dbError } = await supabase
             .from('app_data')
@@ -151,7 +156,7 @@ export const authService = {
             console.error("Erro ao criar dados iniciais:", dbError);
         }
     } else {
-        alert("Conta criada! O Supabase enviou um email de confirmação.\n\nPara pular isso, vá em Authentication > Providers > Email e desmarque 'Confirm Email'.");
+        alert("Conta criada! O Supabase enviou um email de confirmação.");
     }
 
     return { user, ...initialState };
@@ -161,15 +166,14 @@ export const authService = {
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        // console.warn("Tentativa de salvar sem sessão ativa. Ignorando.");
-        return;
-    }
+    if (!session) return;
 
     const { user, ...dataToSave } = state;
     
-    // CORREÇÃO: Salvamos username e avatarUrl dentro do JSON
-    // Isso permite que a função 'search_users' do banco encontre o usuário pelo nome
+    // Remove campo legado 'pdfs' para limpar o banco gradualmente se desejado,
+    // ou mantém se a interface ainda o exigir (no caso removemos do objeto salvo)
+    // delete (dataToSave as any).pdfs;
+
     const payload = {
         ...dataToSave,
         user: { 

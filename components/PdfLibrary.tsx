@@ -51,9 +51,9 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
       return;
     }
 
-    // Limit Size (7MB to prevent browser crash on LocalStorage/JSON handling)
-    if (file.size > 7 * 1024 * 1024) { 
-      alert("Arquivo muito grande. Limite de 7MB para salvar no sistema.");
+    // NOVO LIMITE: 50MB (Suportado por tabela dedicada)
+    if (file.size > 50 * 1024 * 1024) { 
+      alert("Arquivo muito grande. O limite atual é de 50MB.");
       return;
     }
 
@@ -125,7 +125,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
           >
             <Upload size={24} className="mb-2 group-hover:text-app-gold" />
             <span className="uppercase text-xs font-bold tracking-widest">
-              {isUploading ? 'Processando...' : 'Adicionar Arquivo'}
+              {isUploading ? 'Enviando...' : 'Adicionar Arquivo (Máx 50MB)'}
             </span>
             <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3</span>
           </button>

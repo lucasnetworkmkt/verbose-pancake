@@ -183,8 +183,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         /* FORÇA O ESTILO APESAR DO RESET DO TAILWIND */
         .rich-editor-content b, 
         .rich-editor-content strong { 
-            font-weight: 900 !important; 
-            color: var(--app-gold); 
+            font-weight: 900 !important;
+            /* Cor removida para usar a cor atual do texto */
         }
         
         .rich-editor-content i, 

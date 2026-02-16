@@ -1,40 +1,59 @@
+
 import React, { useState, useRef } from 'react';
-import { Upload, Trash2, FileText, Download, AlertCircle, File, Search } from 'lucide-react';
-import { PdfDocument } from '../types';
+import { Upload, Trash2, FileText, Download, File, Search, Video, Music, PlayCircle } from 'lucide-react';
+import { MediaFile, MediaType } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface PdfLibraryProps {
-  pdfs: PdfDocument[];
-  onAddPdf: (pdf: PdfDocument) => void;
-  onUpdatePdf: (pdf: PdfDocument) => void;
-  onDeletePdf: (id: string) => void;
+interface MediaLibraryProps {
+  files: MediaFile[]; // Interface renomeada para genericidade
+  onAddFile: (file: MediaFile) => void;
+  onUpdateFile: (file: MediaFile) => void;
+  onDeleteFile: (id: string) => void;
 }
 
-const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, onDeletePdf }) => {
-  const [selectedPdfId, setSelectedPdfId] = useState<string | null>(null);
+const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateFile, onDeleteFile }) => {
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedPdf = pdfs.find(p => p.id === selectedPdfId);
+  const selectedFile = files.find(p => p.id === selectedFileId);
 
-  // Filter PDFs
-  const filteredPdfs = pdfs.filter(p => 
+  // Filter Files
+  const filteredFiles = files.filter(p => 
     p.fileName.toLowerCase().includes(searchQuery.toLowerCase())
   ).sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+
+  const getFileType = (mime: string): MediaType => {
+      if (mime.startsWith('video/')) return 'VIDEO';
+      if (mime.startsWith('audio/')) return 'AUDIO';
+      return 'PDF';
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      alert("Apenas arquivos PDF são permitidos.");
+    // Validate Types
+    const allowedTypes = [
+        'application/pdf', 
+        'video/mp4', 
+        'video/webm', 
+        'audio/mpeg', 
+        'audio/mp3', 
+        'audio/wav',
+        'audio/x-m4a'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert("Formato não suportado. Use PDF, MP4 ou MP3.");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit check (approx)
-      alert("Arquivo muito grande. Limite de 5MB para persistência local.");
+    // Limit Size (7MB to prevent browser crash on LocalStorage/JSON handling)
+    if (file.size > 7 * 1024 * 1024) { 
+      alert("Arquivo muito grande. Limite de 7MB para salvar no sistema.");
       return;
     }
 
@@ -42,16 +61,21 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
-      const newPdf: PdfDocument = {
+      const type = getFileType(file.type);
+      
+      const newFile: MediaFile = {
         id: crypto.randomUUID(),
         fileName: file.name,
+        fileType: type,
+        mimeType: file.type,
         dataUrl: base64,
         uploadDate: new Date().toISOString(),
         notes: ''
       };
-      onAddPdf(newPdf);
+      
+      onAddFile(newFile);
       setIsUploading(false);
-      setSelectedPdfId(newPdf.id);
+      setSelectedFileId(newFile.id);
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.onerror = () => {
@@ -62,16 +86,23 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
   };
 
   const handleNotesChange = (text: string) => {
-    if (selectedPdf) {
-      onUpdatePdf({ ...selectedPdf, notes: text });
+    if (selectedFile) {
+      onUpdateFile({ ...selectedFile, notes: text });
     }
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    // Exclusão imediata
-    onDeletePdf(id);
-    if (selectedPdfId === id) setSelectedPdfId(null);
+    onDeleteFile(id);
+    if (selectedFileId === id) setSelectedFileId(null);
+  };
+
+  const getFileIcon = (type: MediaType) => {
+      switch(type) {
+          case 'VIDEO': return <Video size={20} className="text-blue-400" />;
+          case 'AUDIO': return <Music size={20} className="text-green-400" />;
+          default: return <FileText size={20} className="text-red-400" />;
+      }
   };
 
   return (
@@ -83,7 +114,7 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
           <input 
              type="file" 
              ref={fileInputRef}
-             accept="application/pdf"
+             accept=".pdf, .mp4, .mp3, .wav, .m4a"
              className="hidden"
              onChange={handleFileUpload}
           />
@@ -94,15 +125,16 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
           >
             <Upload size={24} className="mb-2 group-hover:text-app-gold" />
             <span className="uppercase text-xs font-bold tracking-widest">
-              {isUploading ? 'Processando...' : 'Adicionar PDF'}
+              {isUploading ? 'Processando...' : 'Adicionar Arquivo'}
             </span>
+            <span className="text-[9px] text-app-subtext mt-1">PDF • MP4 • MP3</span>
           </button>
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
             <input 
               type="text" 
-              placeholder="Buscar arquivos..." 
+              placeholder="Buscar na biblioteca..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-app-card border border-app-border rounded pl-10 pr-3 py-3 text-sm text-app-text focus:border-app-gold outline-none"
@@ -112,25 +144,25 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
 
         {/* List */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-           {filteredPdfs.length === 0 && (
+           {filteredFiles.length === 0 && (
              <div className="text-center py-10 text-app-subtext text-sm">
                Biblioteca vazia.
              </div>
            )}
-           {filteredPdfs.map(pdf => (
+           {filteredFiles.map(file => (
              <div 
-               key={pdf.id}
-               onClick={() => setSelectedPdfId(pdf.id)}
-               className={`p-4 rounded border cursor-pointer transition-all group ${selectedPdfId === pdf.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
+               key={file.id}
+               onClick={() => setSelectedFileId(file.id)}
+               className={`p-4 rounded border cursor-pointer transition-all group ${selectedFileId === file.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
              >
                <div className="flex items-center gap-3">
-                 <File className={`${selectedPdfId === pdf.id ? 'text-app-gold' : 'text-app-subtext'}`} size={20} />
+                 {getFileIcon(file.fileType)}
                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-bold text-sm truncate ${selectedPdfId === pdf.id ? 'text-app-text' : 'text-app-text'}`}>{pdf.fileName}</h3>
-                    <span className="text-[10px] text-app-subtext">{format(new Date(pdf.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
+                    <h3 className={`font-bold text-sm truncate ${selectedFileId === file.id ? 'text-app-text' : 'text-app-text'}`}>{file.fileName}</h3>
+                    <span className="text-[10px] text-app-subtext">{format(new Date(file.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
                  <button 
-                    onClick={(e) => handleDelete(e, pdf.id)}
+                    onClick={(e) => handleDelete(e, file.id)}
                     className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
                  >
                     <Trash2 size={16} />
@@ -143,47 +175,75 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
 
       {/* MAIN: VIEWER & NOTES */}
       <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-app-border rounded-lg overflow-hidden relative">
-        {!selectedPdf ? (
+        {!selectedFile ? (
            <div className="flex-1 flex flex-col items-center justify-center text-app-subtext">
              <File size={48} className="mb-4 opacity-20" />
-             <p className="text-sm uppercase tracking-widest">Selecione um arquivo PDF</p>
+             <p className="text-sm uppercase tracking-widest">Selecione um arquivo de mídia</p>
            </div>
         ) : (
            <div className="flex flex-col h-full">
               {/* Header */}
               <div className="p-3 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
-                 <h2 className="text-sm font-bold text-app-text truncate max-w-[70%]">{selectedPdf.fileName}</h2>
-                 <a href={selectedPdf.dataUrl} download={selectedPdf.fileName} className="text-xs text-app-gold hover:underline flex items-center gap-1">
+                 <div className="flex items-center gap-2 overflow-hidden">
+                    {getFileIcon(selectedFile.fileType)}
+                    <h2 className="text-sm font-bold text-app-text truncate max-w-[200px] md:max-w-md">{selectedFile.fileName}</h2>
+                 </div>
+                 <a href={selectedFile.dataUrl} download={selectedFile.fileName} className="text-xs text-app-gold hover:underline flex items-center gap-1">
                     <Download size={12}/> Baixar
                  </a>
               </div>
 
               {/* Split View */}
               <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                 {/* PDF Viewer */}
-                 <div className="h-[60%] md:h-full md:w-[65%] bg-gray-900">
-                    <object 
-                      data={selectedPdf.dataUrl} 
-                      type="application/pdf" 
-                      className="w-full h-full block"
-                    >
-                        <div className="flex items-center justify-center h-full text-center p-6">
-                           <p className="text-gray-500 text-sm">Este navegador não suporta visualização direta de PDF.<br/>Use o botão Baixar acima.</p>
+                 {/* Media Viewer */}
+                 <div className="h-[60%] md:h-full md:w-[65%] bg-black flex items-center justify-center relative">
+                    
+                    {selectedFile.fileType === 'VIDEO' && (
+                        <video 
+                            src={selectedFile.dataUrl} 
+                            controls 
+                            className="w-full h-full max-h-full object-contain" 
+                        />
+                    )}
+
+                    {selectedFile.fileType === 'AUDIO' && (
+                        <div className="w-full p-8 flex flex-col items-center justify-center bg-gray-900 h-full">
+                            <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                                <Music size={40} className="text-app-gold" />
+                            </div>
+                            <audio 
+                                src={selectedFile.dataUrl} 
+                                controls 
+                                className="w-full max-w-md" 
+                            />
                         </div>
-                    </object>
+                    )}
+
+                    {selectedFile.fileType === 'PDF' && (
+                        <object 
+                            data={selectedFile.dataUrl} 
+                            type="application/pdf" 
+                            className="w-full h-full block"
+                        >
+                            <div className="flex items-center justify-center h-full text-center p-6 text-white">
+                                <p className="text-sm">Pré-visualização indisponível.<br/>Use o botão Baixar.</p>
+                            </div>
+                        </object>
+                    )}
+
                  </div>
 
                  {/* Notes Area */}
                  <div className="h-[40%] md:h-full md:w-[35%] bg-app-card border-t md:border-t-0 md:border-l border-app-border flex flex-col">
                     <div className="p-2 bg-app-input border-b border-app-border">
                        <span className="text-xs uppercase font-bold text-app-subtext flex items-center gap-2">
-                          <FileText size={12} /> Anotações do Arquivo
+                          <FileText size={12} /> Anotações
                        </span>
                     </div>
                     <textarea 
-                       value={selectedPdf.notes}
+                       value={selectedFile.notes}
                        onChange={(e) => handleNotesChange(e.target.value)}
-                       placeholder="Anote insights importantes deste documento..."
+                       placeholder={`Insights sobre este ${selectedFile.fileType.toLowerCase()}...`}
                        className="flex-1 w-full bg-transparent p-4 text-sm text-app-text outline-none resize-none leading-relaxed"
                     />
                  </div>
@@ -195,4 +255,4 @@ const PdfLibrary: React.FC<PdfLibraryProps> = ({ pdfs, onAddPdf, onUpdatePdf, on
   );
 };
 
-export default PdfLibrary;
+export default MediaLibrary;

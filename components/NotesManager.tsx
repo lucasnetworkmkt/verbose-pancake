@@ -1,16 +1,17 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, Link, File, Save, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, Link, File, Save, ArrowLeft, Star } from 'lucide-react';
 import { Note, Category, Goal, DocumentItem, MediaFile } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DocumentLibrary from './DocumentLibrary';
-import MediaLibrary from './PdfLibrary'; // Componente renomeado internamente, mantendo arquivo
+import MediaLibrary from './PdfLibrary';
+import RichTextEditor from './RichTextEditor';
 
 interface NotesManagerProps {
   notes: Note[];
   documents: DocumentItem[];
-  files: MediaFile[]; // Renomeado de pdfs
+  files: MediaFile[]; 
   goals: Goal[];
   onAddNote: (note: Note) => void;
   onUpdateNote: (note: Note) => void;
@@ -42,9 +43,8 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   const [editContent, setEditContent] = useState('');
   const [editCategory, setEditCategory] = useState<Category>(Category.MIND);
   const [editGoalId, setEditGoalId] = useState<string>('');
+  const [editIsFavorite, setEditIsFavorite] = useState(false);
   
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   // Initialize editor when selection changes
   useEffect(() => {
     if (selectedNoteId === 'NEW') {
@@ -52,6 +52,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
       setEditContent('');
       setEditCategory(Category.MIND);
       setEditGoalId('');
+      setEditIsFavorite(false);
     } else if (selectedNoteId) {
       const note = notes.find(n => n.id === selectedNoteId);
       if (note) {
@@ -59,28 +60,10 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         setEditContent(note.content);
         setEditCategory(note.category);
         setEditGoalId(note.goalId || '');
+        setEditIsFavorite(note.isFavorite || false);
       }
     }
   }, [selectedNoteId, notes]);
-
-  // Auto-resize textarea on mobile
-  useEffect(() => {
-    const adjustHeight = () => {
-        if (!textareaRef.current) return;
-        const isDesktop = window.innerWidth >= 768;
-        if (isDesktop) {
-            textareaRef.current.style.height = '100%';
-            textareaRef.current.style.overflowY = 'auto';
-        } else {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = Math.max(window.innerHeight * 0.5, textareaRef.current.scrollHeight) + 'px';
-            textareaRef.current.style.overflowY = 'hidden';
-        }
-    };
-    adjustHeight();
-    window.addEventListener('resize', adjustHeight);
-    return () => window.removeEventListener('resize', adjustHeight);
-  }, [editContent, selectedNoteId, activeTab]);
 
   const handleSave = () => {
     if (!editTitle.trim()) return;
@@ -94,6 +77,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         goalId: editGoalId || undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        isFavorite: editIsFavorite
       };
       onAddNote(newNote);
       setSelectedNoteId(newNote.id);
@@ -106,7 +90,8 @@ const NotesManager: React.FC<NotesManagerProps> = ({
           content: editContent,
           category: editCategory,
           goalId: editGoalId || undefined,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          isFavorite: editIsFavorite
         });
       }
     }
@@ -118,6 +103,12 @@ const NotesManager: React.FC<NotesManagerProps> = ({
     }
   };
 
+  // Immediate toggle for favorite in list view
+  const toggleFavoriteList = (e: React.MouseEvent, note: Note) => {
+      e.stopPropagation();
+      onUpdateNote({ ...note, isFavorite: !note.isFavorite });
+  };
+
   const filteredNotes = useMemo(() => {
     return notes
       .filter(n => {
@@ -126,7 +117,11 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         const matchesCategory = categoryFilter === 'ALL' || n.category === categoryFilter;
         return matchesSearch && matchesCategory;
       })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      .sort((a, b) => {
+          // Sort favorites first
+          if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
   }, [notes, searchQuery, categoryFilter]);
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -233,20 +228,33 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     className={`p-4 rounded border cursor-pointer transition-all group ${selectedNoteId === note.id ? 'bg-app-card border-app-gold shadow-lg' : 'bg-app-input border-app-border hover:border-app-subtext'}`}
                     >
                     <div className="flex justify-between items-start mb-2">
-                        <h3 className={`font-bold text-sm ${selectedNoteId === note.id ? 'text-app-text' : 'text-app-text'}`}>{note.title}</h3>
+                        <div className="flex items-center gap-2">
+                            {note.isFavorite && <Star size={12} className="text-app-gold fill-app-gold" />}
+                            <h3 className={`font-bold text-sm ${selectedNoteId === note.id ? 'text-app-text' : 'text-app-text'}`}>{note.title}</h3>
+                        </div>
                         <span className="text-[10px] text-app-subtext">{format(new Date(note.updatedAt), "d MMM", { locale: ptBR })}</span>
                     </div>
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase tracking-wider bg-app-bg px-2 py-0.5 rounded text-app-subtext border border-app-border">
                         {note.category}
                         </span>
-                        <button 
-                        onClick={(e) => handleDelete(e, note.id)}
-                        className="text-app-subtext hover:text-app-red transition-colors"
-                        title="Excluir"
-                        >
-                        <Trash2 size={16} />
-                        </button>
+                        
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={(e) => toggleFavoriteList(e, note)}
+                                className={`transition-colors ${note.isFavorite ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold opacity-0 group-hover:opacity-100'}`}
+                                title="Favoritar"
+                            >
+                                <Star size={16} className={note.isFavorite ? "fill-app-gold" : ""} />
+                            </button>
+                            <button 
+                                onClick={(e) => handleDelete(e, note.id)}
+                                className="text-app-subtext hover:text-app-red transition-colors"
+                                title="Excluir"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
                     </div>
                     </div>
                 ))}
@@ -272,14 +280,24 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         <ArrowLeft size={20} />
                     </button>
 
-                    <div className="flex-1 min-w-[150px]">
+                    <div className="flex-1 min-w-[150px] flex items-center gap-2">
+                        <button 
+                            onClick={() => {
+                                setEditIsFavorite(!editIsFavorite);
+                                // Trigger save logic happens on blur/effect, but we can force update state here
+                                // Since logic is tied to state, it will save on next blur or manual save
+                            }}
+                            className={`p-1 transition-colors ${editIsFavorite ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold'}`}
+                        >
+                            <Star size={20} className={editIsFavorite ? "fill-app-gold" : ""} />
+                        </button>
                         <input 
-                        type="text" 
-                        value={editTitle}
-                        onChange={e => setEditTitle(e.target.value)}
-                        onBlur={handleBlur}
-                        placeholder="Título do Registro"
-                        className="w-full bg-transparent text-base md:text-lg font-bold text-app-text placeholder-app-subtext outline-none"
+                            type="text" 
+                            value={editTitle}
+                            onChange={e => setEditTitle(e.target.value)}
+                            onBlur={handleBlur}
+                            placeholder="Título do Registro"
+                            className="w-full bg-transparent text-base md:text-lg font-bold text-app-text placeholder-app-subtext outline-none"
                         />
                     </div>
                     
@@ -313,14 +331,14 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     )}
                     </div>
 
-                    <textarea 
-                    ref={textareaRef}
-                    value={editContent}
-                    onChange={e => setEditContent(e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Registre decisões, aprendizados e fatos. Seja objetivo."
-                    className="w-full bg-app-card p-4 md:p-6 text-app-text outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-app-red selection:text-white md:flex-1"
-                    />
+                    <div className="flex-1 flex flex-col overflow-hidden" onBlur={handleBlur}>
+                        <RichTextEditor 
+                            content={editContent}
+                            onChange={setEditContent}
+                            placeholder="Registre decisões, aprendizados e fatos. Seja objetivo."
+                            className="h-full border-none rounded-none"
+                        />
+                    </div>
                     
                     <div className="p-2 border-t border-app-border text-[10px] text-app-subtext flex justify-end px-4 shrink-0">
                     {selectedNoteId !== 'NEW' ? 'Auto-save ativo' : 'Preencha o título para salvar'}

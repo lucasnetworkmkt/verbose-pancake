@@ -34,6 +34,53 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
 
 // --- SERVICES ---
 
+export const mediaService = {
+  uploadFile: async (file: File): Promise<{ publicUrl: string, path: string }> => {
+    // 1. Pegar usuário atual
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    // 2. Definir caminho do arquivo: user_id/timestamp_nomearquivo
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    // 3. Upload para o Bucket 'media'
+    const { data, error } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error("Erro upload:", error);
+      throw new Error(`Erro no upload: ${error.message}`);
+    }
+
+    // 4. Obter URL pública
+    const { data: publicData } = supabase.storage
+      .from('media')
+      .getPublicUrl(data.path);
+
+    return {
+      publicUrl: publicData.publicUrl,
+      path: data.path
+    };
+  },
+
+  deleteFile: async (path: string) => {
+    const { error } = await supabase.storage
+      .from('media')
+      .remove([path]);
+
+    if (error) {
+      console.error("Erro ao deletar arquivo:", error);
+      throw new Error("Falha ao remover arquivo do armazenamento.");
+    }
+  }
+};
+
 export const authService = {
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação real com Supabase

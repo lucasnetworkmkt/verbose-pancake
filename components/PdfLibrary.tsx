@@ -1,9 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { Upload, Trash2, FileText, Download, File, Search, Video, Music, PlayCircle } from 'lucide-react';
+import { Upload, Trash2, FileText, Download, File, Search, Video, Music, PlayCircle, Star } from 'lucide-react';
 import { MediaFile, MediaType } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import RichTextEditor from './RichTextEditor';
 
 interface MediaLibraryProps {
   files: MediaFile[]; // Interface renomeada para genericidade
@@ -23,7 +24,10 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
   // Filter Files
   const filteredFiles = files.filter(p => 
     p.fileName.toLowerCase().includes(searchQuery.toLowerCase())
-  ).sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+  ).sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      return new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime();
+  });
 
   const getFileType = (mime: string): MediaType => {
       if (mime.startsWith('video/')) return 'VIDEO';
@@ -70,7 +74,8 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
         mimeType: file.type,
         dataUrl: base64,
         uploadDate: new Date().toISOString(),
-        notes: ''
+        notes: '',
+        isFavorite: false
       };
       
       onAddFile(newFile);
@@ -89,6 +94,11 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
     if (selectedFile) {
       onUpdateFile({ ...selectedFile, notes: text });
     }
+  };
+
+  const toggleFavorite = (e: React.MouseEvent, file: MediaFile) => {
+      e.stopPropagation();
+      onUpdateFile({ ...file, isFavorite: !file.isFavorite });
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -161,6 +171,14 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                     <h3 className={`font-bold text-sm truncate ${selectedFileId === file.id ? 'text-app-text' : 'text-app-text'}`}>{file.fileName}</h3>
                     <span className="text-[10px] text-app-subtext">{format(new Date(file.uploadDate), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
+                 
+                 <button 
+                    onClick={(e) => toggleFavorite(e, file)}
+                    className={`transition-colors ${file.isFavorite ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold opacity-0 group-hover:opacity-100'}`}
+                 >
+                    <Star size={16} className={file.isFavorite ? "fill-app-gold" : ""} />
+                 </button>
+
                  <button 
                     onClick={(e) => handleDelete(e, file.id)}
                     className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
@@ -185,6 +203,12 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
               {/* Header */}
               <div className="p-3 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-2 overflow-hidden">
+                    <button 
+                        onClick={(e) => toggleFavorite(e, selectedFile)}
+                        className={`p-2 bg-app-card border border-app-border rounded flex-shrink-0 transition-colors ${selectedFile.isFavorite ? 'border-app-gold' : ''}`}
+                    >
+                        <Star size={20} className={`${selectedFile.isFavorite ? 'text-app-gold fill-app-gold' : 'text-app-subtext'}`} />
+                    </button>
                     {getFileIcon(selectedFile.fileType)}
                     <h2 className="text-sm font-bold text-app-text truncate max-w-[200px] md:max-w-md">{selectedFile.fileName}</h2>
                  </div>
@@ -240,12 +264,14 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
                           <FileText size={12} /> Anotações
                        </span>
                     </div>
-                    <textarea 
-                       value={selectedFile.notes}
-                       onChange={(e) => handleNotesChange(e.target.value)}
-                       placeholder={`Insights sobre este ${selectedFile.fileType.toLowerCase()}...`}
-                       className="flex-1 w-full bg-transparent p-4 text-sm text-app-text outline-none resize-none leading-relaxed"
-                    />
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <RichTextEditor 
+                            content={selectedFile.notes}
+                            onChange={handleNotesChange}
+                            placeholder={`Insights sobre este ${selectedFile.fileType.toLowerCase()}...`}
+                            className="h-full border-none rounded-none"
+                        />
+                    </div>
                  </div>
               </div>
            </div>

@@ -70,12 +70,13 @@ export interface DayLog {
 export interface Note {
   id: string;
   title: string;
-  content: string;
+  content: string; // Agora suporta HTML simples
   category: Category;
   createdAt: string;
   updatedAt: string;
   goalId?: string;
   relatedDate?: string;
+  isFavorite?: boolean; // Novo campo
 }
 
 export interface DocumentItem {
@@ -83,7 +84,8 @@ export interface DocumentItem {
   title: string;
   url: string;
   createdAt: string;
-  notes: string;
+  notes: string; // Agora suporta HTML simples
+  isFavorite?: boolean; // Novo campo
 }
 
 export type MediaType = 'PDF' | 'VIDEO' | 'AUDIO';
@@ -95,7 +97,8 @@ export interface MediaFile {
   mimeType: string;
   dataUrl: string;
   uploadDate: string;
-  notes: string;
+  notes: string; // Agora suporta HTML simples
+  isFavorite?: boolean; // Novo campo
 }
 
 // Mantido apenas para compatibilidade de tipos legados temporária, se necessário

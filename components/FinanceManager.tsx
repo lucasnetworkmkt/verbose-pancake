@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { Transaction, User } from '../types';
-import { TrendingDown, TrendingUp, DollarSign, PlusCircle, Calendar, Trash2, AlertCircle } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, PlusCircle, Calendar, Trash2, AlertCircle, Tag } from 'lucide-react';
 import { format, isSameMonth, parseISO, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, YAxis } from 'recharts';
@@ -10,6 +10,29 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, YAxis } from 
 interface FinanceManagerProps {
   user: User;
 }
+
+// --- CONSTANTS: CATEGORIES ---
+const INCOME_CATEGORIES = [
+  'Salário',
+  'Freelance',
+  'Vendas',
+  'Comissões',
+  'Presentes',
+  'Investimentos',
+  'Outros'
+];
+
+const EXPENSE_GROUPS = {
+  '🏠 Despesas Fixas': ['Aluguel', 'Energia', 'Água', 'Internet', 'Escola/Faculdade', 'Assinaturas', 'Academia'],
+  '🍔 Alimentação': ['Mercado', 'Delivery', 'Restaurante', 'Lanches'],
+  '🚗 Transporte': ['Combustível', 'Uber/99', 'Ônibus', 'Manutenção Veículo'],
+  '🎮 Lazer': ['Cinema', 'Jogos', 'Passeios', 'Streaming', 'Saídas'],
+  '🧠 Desenv. Pessoal': ['Livros', 'Cursos', 'Eventos', 'Ferramentas'],
+  '💊 Saúde': ['Remédios', 'Consultas', 'Exames', 'Suplementos'],
+  '👕 Compras Pessoais': ['Roupas', 'Calçados', 'Acessórios', 'Eletrônicos'],
+  '📈 Investimentos': ['Renda Fixa', 'Ações', 'Cripto', 'Reserva Emergência', 'Negócios'],
+  '💳 Outros': ['Multas', 'Taxas', 'Consertos', 'Imprevistos']
+};
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<'REGISTER' | 'EXPENSES' | 'GAINS'>('REGISTER');
@@ -19,6 +42,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
   // Register Form State
   const [inputText, setInputText] = useState('');
   const [transactionType, setTransactionType] = useState<'despesa' | 'ganho'>('despesa');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [parsedAmount, setParsedAmount] = useState<number | null>(null);
 
@@ -26,6 +50,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
   useEffect(() => {
     fetchTransactions();
   }, [user.id]);
+
+  // Reset category when type changes
+  useEffect(() => {
+    if (transactionType === 'ganho') {
+        setSelectedCategory('Salário');
+    } else {
+        setSelectedCategory('Mercado'); // Default expense
+    }
+  }, [transactionType]);
 
   const fetchTransactions = async () => {
     try {
@@ -77,6 +110,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
           type: transactionType,
           amount: parsedAmount,
           description: inputText,
+          category: selectedCategory
         })
         .select()
         .single();
@@ -202,14 +236,39 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
                 </div>
               </div>
 
+              {/* Category Selector */}
+              <div>
+                  <label className="block text-[10px] text-app-subtext uppercase font-bold mb-1">Categoria</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full bg-app-input border border-app-border rounded p-3 text-app-text outline-none focus:border-app-gold text-sm md:text-base appearance-none"
+                    style={{ backgroundImage: 'none' }} // Remove default arrow if needed, but styling varies
+                  >
+                    {transactionType === 'ganho' ? (
+                        INCOME_CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))
+                    ) : (
+                        Object.entries(EXPENSE_GROUPS).map(([group, items]) => (
+                            <optgroup key={group} label={group}>
+                                {items.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </optgroup>
+                        ))
+                    )}
+                  </select>
+              </div>
+
               {/* Input Area Compact */}
               <div>
                 <label className="block text-[10px] text-app-subtext uppercase font-bold mb-1">Descrição e Valor</label>
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder={transactionType === 'despesa' ? "Ex: 50,00 mercado" : "Ex: 200,00 freela"}
-                  className="w-full bg-app-input border border-app-border rounded p-3 text-app-text outline-none focus:border-app-gold resize-none h-24 md:h-32 text-sm md:text-base"
+                  placeholder={transactionType === 'despesa' ? "Ex: 50,00 Compra do Mês" : "Ex: 200,00 Projeto Extra"}
+                  className="w-full bg-app-input border border-app-border rounded p-3 text-app-text outline-none focus:border-app-gold resize-none h-20 md:h-24 text-sm md:text-base"
                   autoFocus
                 />
               </div>
@@ -300,8 +359,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ user }) => {
                         {t.type === 'despesa' ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
                      </div>
                      <div className="min-w-0">
-                        <p className="font-medium text-app-text truncate text-xs md:text-sm">{t.description}</p>
-                        <span className="text-[10px] text-app-subtext flex items-center gap-1">
+                        <div className="flex items-center gap-2">
+                            {t.category && (
+                                <span className="text-[10px] bg-app-input border border-app-border px-1.5 py-0.5 rounded text-app-subtext uppercase tracking-wide shrink-0">
+                                    {t.category}
+                                </span>
+                            )}
+                            <p className="font-medium text-app-text truncate text-xs md:text-sm">{t.description}</p>
+                        </div>
+                        <span className="text-[10px] text-app-subtext flex items-center gap-1 mt-0.5">
                            <Calendar size={10} /> {format(parseISO(t.created_at), "d MMM, HH:mm", { locale: ptBR })}
                         </span>
                      </div>

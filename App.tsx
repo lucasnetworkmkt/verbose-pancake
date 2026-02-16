@@ -34,7 +34,7 @@ import {
   DollarSign,
   Grid
 } from 'lucide-react';
-import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, PdfDocument } from './types';
+import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile } from './types';
 import { authService, dataService } from './services/storage';
 import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
 import CheckInModal from './components/CheckInModal';
@@ -639,16 +639,18 @@ function App() {
   const handleStartLevel3 = () => { setAppState(prev => { if(!prev || !prev.evolution) return null; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...prev.evolution, level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
   const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...prev.evolution, level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
 
-  // Note, Doc, PDF Handlers...
+  // Note, Doc, Media Handlers...
   const handleAddNote = (note: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; return { ...prev, notes: [note, ...currentNotes] }; }); };
   const handleUpdateNote = (updatedNote: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.map(n => n.id === updatedNote.id ? updatedNote : n); return { ...prev, notes: updatedNotes }; }); };
   const handleDeleteNote = (id: string) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; const updatedNotes = currentNotes.filter(n => n.id !== id); return { ...prev, notes: updatedNotes }; }); showToast("Anotação excluída."); };
   const handleAddDocument = (doc: DocumentItem) => { setAppState(prev => { if(!prev) return null; const currentDocs = prev.documents || []; return { ...prev, documents: [doc, ...currentDocs] }; }); };
   const handleUpdateDocument = (updatedDoc: DocumentItem) => { setAppState(prev => { if(!prev) return null; const currentDocs = prev.documents || []; const updatedDocs = currentDocs.map(d => d.id === updatedDoc.id ? updatedDoc : d); return { ...prev, documents: updatedDocs }; }); };
   const handleDeleteDocument = (id: string) => { setAppState(prev => { if(!prev) return null; const currentDocs = prev.documents || []; const updatedDocs = currentDocs.filter(d => d.id !== id); return { ...prev, documents: updatedDocs }; }); showToast("Link excluído."); };
-  const handleAddPdf = (pdf: PdfDocument) => { setAppState(prev => { if(!prev) return null; const currentPdfs = prev.pdfs || []; return { ...prev, pdfs: [pdf, ...currentPdfs] }; }); };
-  const handleUpdatePdf = (updatedPdf: PdfDocument) => { setAppState(prev => { if(!prev) return null; const currentPdfs = prev.pdfs || []; const updatedPdfs = currentPdfs.map(p => p.id === updatedPdf.id ? updatedPdf : p); return { ...prev, pdfs: updatedPdfs }; }); };
-  const handleDeletePdf = (id: string) => { setAppState(prev => { if(!prev) return null; const currentPdfs = prev.pdfs || []; const updatedPdfs = currentPdfs.filter(p => p.id !== id); return { ...prev, pdfs: updatedPdfs }; }); showToast("Arquivo excluído."); };
+  
+  // Media Files (formerly PDF) handlers
+  const handleAddFile = (file: MediaFile) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; return { ...prev, files: [file, ...currentFiles] }; }); };
+  const handleUpdateFile = (updatedFile: MediaFile) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; const updatedFiles = currentFiles.map(p => p.id === updatedFile.id ? updatedFile : p); return { ...prev, files: updatedFiles }; }); };
+  const handleDeleteFile = (id: string) => { setAppState(prev => { if(!prev) return null; const currentFiles = prev.files || []; const updatedFiles = currentFiles.filter(p => p.id !== id); return { ...prev, files: updatedFiles }; }); showToast("Arquivo excluído."); };
 
   // --- Render ---
 
@@ -663,7 +665,7 @@ function App() {
   
   const userNotes = appState.notes || [];
   const userDocuments = appState.documents || [];
-  const userPdfs = appState.pdfs || [];
+  const userFiles = appState.files || []; // Renomeado
   const evolutionState = appState.evolution || { completedDays: [], startDate: null, completedDaysLevel2: [], startDateLevel2: null, level3: { isStarted: false, completedDays: [], lastCompletionDate: null, startDate: null } };
 
   const isLevel1Complete = evolutionState.completedDays.length >= 40;
@@ -1061,7 +1063,7 @@ function App() {
           )}
 
           {/* NOTES TAB */}
-          {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} pdfs={userPdfs} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddPdf={handleAddPdf} onUpdatePdf={handleUpdatePdf} onDeletePdf={handleDeletePdf} /></div>}
+          {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} files={userFiles} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddFile={handleAddFile} onUpdateFile={handleUpdateFile} onDeleteFile={handleDeleteFile} /></div>}
 
           {/* FINANCE TAB */}
           {activeTab === 'FINANCE' && appState.user && <div className="h-full"><FinanceManager user={appState.user} /></div>}

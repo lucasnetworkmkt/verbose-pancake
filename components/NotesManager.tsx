@@ -1,16 +1,16 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus, Trash2, FileText, Link, File, Save, ArrowLeft } from 'lucide-react';
-import { Note, Category, Goal, DocumentItem, PdfDocument } from '../types';
+import { Note, Category, Goal, DocumentItem, MediaFile } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import DocumentLibrary from './DocumentLibrary';
-import PdfLibrary from './PdfLibrary';
+import MediaLibrary from './PdfLibrary'; // Componente renomeado internamente, mantendo arquivo
 
 interface NotesManagerProps {
   notes: Note[];
   documents: DocumentItem[];
-  pdfs: PdfDocument[]; // Adicionado
+  files: MediaFile[]; // Renomeado de pdfs
   goals: Goal[];
   onAddNote: (note: Note) => void;
   onUpdateNote: (note: Note) => void;
@@ -18,16 +18,16 @@ interface NotesManagerProps {
   onAddDocument: (doc: DocumentItem) => void;
   onUpdateDocument: (doc: DocumentItem) => void;
   onDeleteDocument: (id: string) => void;
-  onAddPdf: (pdf: PdfDocument) => void;
-  onUpdatePdf: (pdf: PdfDocument) => void;
-  onDeletePdf: (id: string) => void;
+  onAddFile: (file: MediaFile) => void;
+  onUpdateFile: (file: MediaFile) => void;
+  onDeleteFile: (id: string) => void;
 }
 
 const NotesManager: React.FC<NotesManagerProps> = ({ 
-  notes, documents, pdfs, goals, 
+  notes, documents, files, goals, 
   onAddNote, onUpdateNote, onDeleteNote,
   onAddDocument, onUpdateDocument, onDeleteDocument,
-  onAddPdf, onUpdatePdf, onDeletePdf
+  onAddFile, onUpdateFile, onDeleteFile
 }) => {
   // Tab Switcher State
   const [activeTab, setActiveTab] = useState<'TEXT' | 'LINKS' | 'FILES'>('TEXT');
@@ -67,23 +67,16 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   useEffect(() => {
     const adjustHeight = () => {
         if (!textareaRef.current) return;
-        
-        // Verifica se é desktop (md breakpoint do tailwind é 768px)
         const isDesktop = window.innerWidth >= 768;
-
         if (isDesktop) {
-            // Desktop: Altura controlada pelo container (h-full), scroll interno
             textareaRef.current.style.height = '100%';
             textareaRef.current.style.overflowY = 'auto';
         } else {
-            // Mobile: Altura expande com o conteúdo, scroll na página
             textareaRef.current.style.height = 'auto';
-            // Min-height de 60vh para garantir espaço confortável mesmo com pouco texto
             textareaRef.current.style.height = Math.max(window.innerHeight * 0.5, textareaRef.current.scrollHeight) + 'px';
             textareaRef.current.style.overflowY = 'hidden';
         }
     };
-
     adjustHeight();
     window.addEventListener('resize', adjustHeight);
     return () => window.removeEventListener('resize', adjustHeight);
@@ -138,12 +131,9 @@ const NotesManager: React.FC<NotesManagerProps> = ({
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    // Exclusão imediata sem confirm
     onDeleteNote(id);
     if (selectedNoteId === id) setSelectedNoteId(null);
   };
-
-  // --- Render ---
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -165,7 +155,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 onClick={() => setActiveTab('FILES')}
                 className={`flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${activeTab === 'FILES' ? 'text-app-text border-b-2 border-app-red' : 'text-app-subtext hover:text-app-text'}`}
             >
-                <File size={16} /> Biblioteca de Arquivos
+                <File size={16} /> Biblioteca de Mídia
             </button>
         </div>
 
@@ -179,23 +169,19 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         )}
         
         {activeTab === 'FILES' && (
-            <PdfLibrary 
-                pdfs={pdfs}
-                onAddPdf={onAddPdf}
-                onUpdatePdf={onUpdatePdf}
-                onDeletePdf={onDeletePdf}
+            <MediaLibrary 
+                files={files}
+                onAddFile={onAddFile}
+                onUpdateFile={onUpdateFile}
+                onDeleteFile={onDeleteFile}
             />
         )}
         
         {activeTab === 'TEXT' && (
             <div className="flex flex-col md:flex-row md:h-[calc(100vh-190px)] gap-6">
             
-            {/* LEFT COLUMN: LIST 
-                Lógica: Se houver uma nota selecionada, esconde a lista no mobile (hidden).
-                No desktop (md:flex), sempre mostra.
-            */}
+            {/* LEFT COLUMN: LIST */}
             <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedNoteId ? 'hidden md:flex' : 'flex'} md:h-full`}>
-                {/* Actions Bar */}
                 <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
@@ -216,7 +202,6 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 </button>
                 </div>
 
-                {/* Filter */}
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin shrink-0">
                 <button 
                     onClick={() => setCategoryFilter('ALL')}
@@ -235,7 +220,6 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 ))}
                 </div>
 
-                {/* List */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2">
                 {filteredNotes.length === 0 && (
                     <div className="text-center py-10 text-app-subtext text-sm">
@@ -269,10 +253,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: EDITOR 
-                Lógica: Se NÃO houver nota selecionada, esconde o editor no mobile (hidden).
-                No desktop (md:flex), sempre mostra.
-            */}
+            {/* RIGHT COLUMN: EDITOR */}
             <div className={`w-full md:w-2/3 bg-app-card border border-app-border rounded-lg flex-col relative ${!selectedNoteId ? 'hidden md:flex' : 'flex'} md:overflow-hidden`}>
                 {!selectedNoteId ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-app-subtext p-8">
@@ -284,7 +265,6 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     {/* Editor Toolbar */}
                     <div className="p-3 md:p-4 border-b border-app-border flex flex-wrap gap-2 md:gap-4 items-center bg-app-input shrink-0 sticky top-0 z-10">
                     
-                    {/* Botão Voltar (Apenas Mobile) */}
                     <button 
                         onClick={() => setSelectedNoteId(null)}
                         className="md:hidden p-2 -ml-2 text-app-subtext hover:text-app-gold transition-colors"
@@ -333,7 +313,6 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     )}
                     </div>
 
-                    {/* Editor Content */}
                     <textarea 
                     ref={textareaRef}
                     value={editContent}

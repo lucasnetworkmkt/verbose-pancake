@@ -40,38 +40,49 @@ export const mediaService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado.");
 
-    // 2. Definir caminho do arquivo SEGURO
-    // O erro 400 geralmente ocorre por caracteres inválidos no nome.
-    // Vamos garantir que o nome seja apenas alfanumérico.
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    // 2. Definir caminho do arquivo SUPER SEGURO
+    // Remove qualquer caractere que não seja letra ou número da extensão
+    const rawExt = file.name.split('.').pop() || 'bin';
+    const fileExt = rawExt.replace(/[^a-z0-9]/gi, '').toLowerCase(); 
+    
     const randomString = Math.random().toString(36).slice(2, 10);
     const timestamp = Date.now();
     
     // Nome final: timestamp_random.ext (Ex: 17150000_abc123.pdf)
     const fileName = `${timestamp}_${randomString}.${fileExt}`;
     
-    // Caminho: user_id/nome_arquivo
+    // Caminho: user_id/nome_arquivo (Sem barra inicial)
     const filePath = `${user.id}/${fileName}`;
 
-    // 3. Upload para o Bucket 'media'
+    // 3. CONVERTER PARA ARRAYBUFFER (CORREÇÃO DO ERRO 400)
+    // Enviar o objeto File diretamente às vezes causa erro de boundary no multipart form data
+    const fileBuffer = await file.arrayBuffer();
+
+    // 4. Upload para o Bucket 'media'
     const { data, error } = await supabase.storage
       .from('media')
-      .upload(filePath, file, {
+      .upload(filePath, fileBuffer, {
         cacheControl: '3600',
-        upsert: false,
-        contentType: file.type // IMPORTANTE: Envia o tipo MIME explicitamente para evitar erros
-      });
+        upsert: true, // Força sobrescrita se houver conflito de nome (improvável)
+        contentType: file.type, // IMPORTANTE: Tipo MIME original
+        duplex: 'half' // Necessário para alguns navegadores em uploads grandes
+      } as any);
 
     if (error) {
       console.error("Erro detalhado Supabase:", error);
-      // Tratamento para erro comum de bucket não encontrado
+      
+      // Tratamento específico de erros comuns
       if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
-         throw new Error("Erro: O Bucket 'media' não foi encontrado. Verifique se criou com o nome exato (minúsculo) no painel do Supabase.");
+         throw new Error("Erro: O Bucket 'media' não existe. Crie um bucket público chamado 'media' no painel do Supabase.");
       }
+      if (error.statusCode === '400' || error.message.includes("400")) {
+         throw new Error("Erro 400: O Supabase rejeitou o arquivo. Verifique se o bucket 'media' está criado e se é Público.");
+      }
+      
       throw new Error(`Erro no upload: ${error.message}`);
     }
 
-    // 4. Obter URL pública
+    // 5. Obter URL pública
     const { data: publicData } = supabase.storage
       .from('media')
       .getPublicUrl(data.path);

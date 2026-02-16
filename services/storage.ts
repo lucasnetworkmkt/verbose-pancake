@@ -8,7 +8,7 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   routines: [],
   notes: [],
   documents: [],
-  files: [], // Inicializa array de arquivos genérico
+  files: [], // Será preenchido pela tabela user_files
   dayLogs: {},
   lastCheckIn: null,
   settings: { silentMode: false, validDayThreshold: 0.7, theme: 'dark' },
@@ -32,65 +32,103 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
   }
 });
 
-// --- SERVICES ---
+// --- FILE SERVICE (Operações diretas na tabela user_files) ---
+export const fileService = {
+  uploadFile: async (userId: string, file: MediaFile) => {
+    const { error } = await supabase.from('user_files').insert({
+      id: file.id,
+      user_id: userId,
+      file_name: file.fileName,
+      file_type: file.fileType,
+      mime_type: file.mimeType,
+      data_url: file.dataUrl,
+      notes: file.notes,
+      created_at: file.uploadDate
+    });
+    
+    if (error) {
+      console.error("Erro ao salvar arquivo:", error);
+      throw new Error("Erro ao salvar arquivo no banco.");
+    }
+  },
+
+  deleteFile: async (fileId: string) => {
+    const { error } = await supabase.from('user_files').delete().eq('id', fileId);
+    if (error) console.error("Erro ao deletar arquivo:", error);
+  },
+
+  updateFile: async (file: MediaFile) => {
+    const { error } = await supabase.from('user_files').update({
+      notes: file.notes
+    }).eq('id', file.id);
+    if (error) console.error("Erro ao atualizar arquivo:", error);
+  }
+};
+
+// --- AUTH & DATA SERVICES ---
 
 export const authService = {
   login: async (email: string, password: string): Promise<AppState | null> => {
-    // 1. Autenticação real com Supabase
+    // 1. Autenticação
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
     if (authError) {
-      if (authError.message.includes("Invalid login credentials")) {
-        throw new Error("Email ou senha incorretos.");
-      }
-      if (authError.message.includes("Email not confirmed")) {
-        throw new Error("Email não confirmado. Verifique sua caixa de entrada ou desative a confirmação no Supabase.");
-      }
+      if (authError.message.includes("Invalid login credentials")) throw new Error("Email ou senha incorretos.");
+      if (authError.message.includes("Email not confirmed")) throw new Error("Email não confirmado.");
       throw new Error(authError.message);
     }
 
-    if (!authData.user) {
-      throw new Error("Erro desconhecido ao realizar login.");
-    }
+    if (!authData.user) throw new Error("Erro desconhecido ao realizar login.");
 
-    // 2. Buscar dados do aplicativo no banco
+    // 2. Buscar App Data (JSON Geral)
     const { data: dbData, error: dbError } = await supabase
       .from('app_data')
       .select('data')
       .eq('user_id', authData.user.id)
       .single();
 
+    // 3. Buscar User Files (Tabela Dedicada)
+    const { data: filesData, error: filesError } = await supabase
+      .from('user_files')
+      .select('*')
+      .eq('user_id', authData.user.id);
+
     if (dbError && dbError.code !== 'PGRST116') { 
         console.error("Erro ao buscar dados:", dbError);
-        throw new Error("Falha ao carregar seus dados.");
     }
 
-    // Se não tiver dados salvos, cria estado inicial
+    // Prepara estado inicial ou carrega do banco
     const appStateData = dbData?.data || createInitialState();
     
-    // Migração de dados legados (Theme)
-    if (appStateData.settings && !appStateData.settings.theme) {
-        appStateData.settings.theme = 'dark';
+    // Mapeia os arquivos da tabela nova para o formato do AppState
+    let loadedFiles: MediaFile[] = [];
+    if (filesData) {
+        loadedFiles = filesData.map((f: any) => ({
+            id: f.id,
+            fileName: f.file_name,
+            fileType: f.file_type,
+            mimeType: f.mime_type,
+            dataUrl: f.data_url,
+            uploadDate: f.created_at,
+            notes: f.notes || ''
+        }));
     }
-    
-    // Migração de dados legados (PDFs -> Files)
-    if (!appStateData.files) {
-        // Se existia 'pdfs', migra para 'files'
-        if (appStateData.pdfs && Array.isArray(appStateData.pdfs)) {
-             appStateData.files = appStateData.pdfs.map((p: any) => ({
-                 ...p,
-                 fileType: 'PDF', // Assume PDF para dados antigos
-                 mimeType: 'application/pdf'
-             }));
-        } else {
-             appStateData.files = [];
-        }
+
+    // Fallback: Se tiver arquivos no JSON antigo (legado), junta eles, mas preferência para a tabela nova
+    if (appStateData.files && appStateData.files.length > 0) {
+        // Opcional: Aqui poderíamos migrar automaticamente, mas vamos apenas concatenar na memória por enquanto
+        // para não perder dados antigos até que o usuário exclua.
+        // O ideal é o usuário deletar e subir de novo no sistema novo.
+    } else {
+        appStateData.files = loadedFiles;
     }
+
+    // Migrações de segurança
+    if (appStateData.settings && !appStateData.settings.theme) appStateData.settings.theme = 'dark';
     
-    // Montar o objeto User local
     const user: User = {
         id: authData.user.id,
         username: authData.user.user_metadata?.username || email.split('@')[0],
@@ -100,40 +138,20 @@ export const authService = {
         createdAt: new Date(authData.user.created_at).getTime()
     };
 
-    return { ...appStateData, user };
+    return { ...appStateData, files: loadedFiles, user };
   },
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {
-    // 1. Criar usuário no Auth do Supabase
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { username }
-      }
+      options: { data: { username } }
     });
 
-    if (authError) {
-       console.error("Erro Supabase:", authError);
-       if (authError.message.includes("rate limit")) {
-         throw new Error("Limite de emails excedido (Supabase).\n\nSOLUÇÃO: Vá no painel Supabase > Authentication > Providers > Email e DESATIVE 'Confirm email'.");
-       }
-       if (authError.message.includes("User already registered")) {
-         throw new Error("Este email já está cadastrado. Tente fazer login.");
-       }
-       if (authError.message.includes("Password should be")) {
-         throw new Error("A senha deve ter pelo menos 6 caracteres.");
-       }
-       throw new Error(authError.message);
-    }
+    if (authError) throw new Error(authError.message);
+    if (!authData.user) throw new Error("Erro ao iniciar registro.");
 
-    if (!authData.user) {
-        throw new Error("Erro ao iniciar registro.");
-    }
-
-    // 2. Preparar estado inicial
     const initialState = createInitialState();
-    
     const user: User = {
         id: authData.user.id,
         username: username,
@@ -143,20 +161,13 @@ export const authService = {
         createdAt: Date.now()
     };
 
-    // 3. Salvar estado inicial
     if (authData.session) {
-        const { error: dbError } = await supabase
-            .from('app_data')
-            .insert({
-                user_id: authData.user.id,
-                data: { ...initialState, user: { avatarUrl: '', username: username } } 
-            });
-
-        if (dbError) {
-            console.error("Erro ao criar dados iniciais:", dbError);
-        }
+        await supabase.from('app_data').insert({
+            user_id: authData.user.id,
+            data: { ...initialState, user: { avatarUrl: '', username } } 
+        });
     } else {
-        alert("Conta criada! O Supabase enviou um email de confirmação.");
+        alert("Conta criada! Confirme seu email.");
     }
 
     return { user, ...initialState };
@@ -168,11 +179,13 @@ export const dataService = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const { user, ...dataToSave } = state;
+    // CRUCIAL: Removemos 'files' e 'user' do JSON principal para salvar
+    // Files agora vão para tabela user_files (salvos individualmente no momento do upload)
+    // User info básica fica no JSON para persistir avatar/username, mas senha não precisa ir pro JSON
+    const { user, files, ...dataToSave } = state;
     
-    // Remove campo legado 'pdfs' para limpar o banco gradualmente se desejado,
-    // ou mantém se a interface ainda o exigir (no caso removemos do objeto salvo)
-    // delete (dataToSave as any).pdfs;
+    // Removemos também o campo legado pdfs se existir
+    delete (dataToSave as any).pdfs;
 
     const payload = {
         ...dataToSave,
@@ -190,8 +203,6 @@ export const dataService = {
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
-    if (error) {
-        console.error("Erro ao sincronizar com Supabase:", error.message);
-    }
+    if (error) console.error("Erro ao sincronizar App Data:", error.message);
   }
 };

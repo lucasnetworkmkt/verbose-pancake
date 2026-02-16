@@ -1,6 +1,6 @@
 
 import { AppState, User, MediaFile } from '../types';
-import { supabase } from './supabase';
+import { supabase, supabaseUrl } from './supabase';
 
 // Helper for initial state creation
 const createInitialState = (): Omit<AppState, 'user'> => ({
@@ -37,56 +37,56 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
 export const mediaService = {
   uploadFile: async (file: File): Promise<{ publicUrl: string, path: string }> => {
     // 1. Pegar usuário atual
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = supabase.auth.user();
     if (!user) throw new Error("Usuário não autenticado.");
 
-    // 2. Sanitizar Nome (CRÍTICO PARA EVITAR ERRO 400)
-    // Remove tudo que não for alfanumérico para garantir aceitação do Supabase
+    // 2. Definir caminho do arquivo SEGURO (UUID)
+    // Usamos UUID para garantir que o nome nunca contenha caracteres inválidos
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
-    // Pega apenas letras e numeros do nome original, limita a 15 chars
-    const cleanName = file.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 15);
-    const timestamp = Date.now();
-    
-    // Nome final seguro: timestamp_nome.ext
-    const fileName = `${timestamp}_${cleanName}.${fileExt}`;
-    
-    // Caminho: user_id/nome_arquivo
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
     const filePath = `${user.id}/${fileName}`;
 
-    // 3. Upload Simplificado (Padrão)
-    // Removemos 'duplex' e conversão de buffer que podem causar erro 400 em alguns ambientes
+    // 3. Upload Simplificado
     const { data, error } = await supabase.storage
       .from('media')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: file.type || 'application/octet-stream' // Garante Content-Type
       });
 
     if (error) {
       console.error("Erro Supabase Storage:", error);
       
+      // VERIFICAÇÃO CRÍTICA: PROJETO DEMO
+      if (supabaseUrl.includes("ulhcfwfoewdviirhupts")) {
+         throw new Error("ERRO DE CONFIGURAÇÃO: Você está usando o banco de dados de DEMONSTRAÇÃO padrão, que não permite uploads de arquivos.\n\nSOLUÇÃO: Crie seu próprio projeto no Supabase, crie um bucket chamado 'media' e configure as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.");
+      }
+
       // Tratamento de erros comuns
       if (error.statusCode === '400' || error.message.includes("400")) {
-         throw new Error("Erro 400 (Bad Request). Verifique:\n1. Se o bucket 'media' existe no Supabase.\n2. Se o bucket está configurado como PÚBLICO.\n3. Se o arquivo respeita o limite de tamanho do bucket (50MB).");
+         throw new Error("Erro 400 (Bad Request). Causas prováveis:\n1. O bucket 'media' não existe no seu projeto.\n2. O arquivo é 0 bytes ou corrompido.\n3. O bucket não é Público.");
       }
       if (error.message.includes("The resource was not found") || error.message.includes("Bucket not found")) {
-         throw new Error("Erro: Bucket 'media' não encontrado. Crie um bucket PÚBLICO chamado 'media' no painel do Supabase.");
+         throw new Error("Erro: Bucket 'media' não encontrado. Vá no painel do Supabase > Storage e crie um bucket PÚBLICO chamado 'media'.");
       }
       if (error.message.includes("Payload too large")) {
-         throw new Error("O arquivo é maior que o limite permitido pelo Supabase (verifique a configuração do Bucket).");
+         throw new Error("O arquivo é maior que o limite permitido pelo Supabase.");
       }
       
       throw new Error(`Falha no upload: ${error.message}`);
     }
 
     // 4. Obter URL pública
+    // Note: In v1, data might have Key. Assuming path is available or handling implicitly.
+    const path = (data as any).path || (data as any).Key;
     const { data: publicData } = supabase.storage
       .from('media')
-      .getPublicUrl(data.path);
+      .getPublicUrl(path);
 
     return {
       publicUrl: publicData.publicUrl,
-      path: data.path
+      path: path
     };
   },
 
@@ -105,7 +105,7 @@ export const mediaService = {
 export const authService = {
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação real com Supabase
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const { user: authUser, error: authError } = await supabase.auth.signIn({
       email,
       password
     });
@@ -120,7 +120,7 @@ export const authService = {
       throw new Error(authError.message);
     }
 
-    if (!authData.user) {
+    if (!authUser) {
       throw new Error("Erro desconhecido ao realizar login.");
     }
 
@@ -128,7 +128,7 @@ export const authService = {
     const { data: dbData, error: dbError } = await supabase
       .from('app_data')
       .select('data')
-      .eq('user_id', authData.user.id)
+      .eq('user_id', authUser.id)
       .single();
 
     if (dbError && dbError.code !== 'PGRST116') { 
@@ -160,12 +160,12 @@ export const authService = {
     
     // Montar o objeto User local
     const user: User = {
-        id: authData.user.id,
-        username: authData.user.user_metadata?.username || email.split('@')[0],
-        email: authData.user.email || '',
+        id: authUser.id,
+        username: authUser.user_metadata?.username || email.split('@')[0],
+        email: authUser.email || '',
         password: password, 
         avatarUrl: appStateData.user?.avatarUrl || '', 
-        createdAt: new Date(authData.user.created_at).getTime()
+        createdAt: new Date(authUser.created_at).getTime()
     };
 
     return { ...appStateData, user };
@@ -173,13 +173,10 @@ export const authService = {
 
   register: async (username: string, email: string, password: string): Promise<AppState> => {
     // 1. Criar usuário no Auth do Supabase
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { username }
-      }
-    });
+    const { user: authUser, session, error: authError } = await supabase.auth.signUp(
+      { email, password },
+      { data: { username } }
+    );
 
     if (authError) {
        console.error("Erro Supabase:", authError);
@@ -195,7 +192,7 @@ export const authService = {
        throw new Error(authError.message);
     }
 
-    if (!authData.user) {
+    if (!authUser) {
         throw new Error("Erro ao iniciar registro.");
     }
 
@@ -203,7 +200,7 @@ export const authService = {
     const initialState = createInitialState();
     
     const user: User = {
-        id: authData.user.id,
+        id: authUser.id,
         username: username,
         email: email,
         password: password,
@@ -212,11 +209,11 @@ export const authService = {
     };
 
     // 3. Salvar estado inicial
-    if (authData.session) {
+    if (session) {
         const { error: dbError } = await supabase
             .from('app_data')
             .insert({
-                user_id: authData.user.id,
+                user_id: authUser.id,
                 data: { ...initialState, user: { avatarUrl: '', username: username } } 
             });
 
@@ -233,14 +230,10 @@ export const authService = {
 
 export const dataService = {
   saveState: async (userId: string, state: AppState) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = supabase.auth.session();
     if (!session) return;
 
     const { user, ...dataToSave } = state;
-    
-    // Remove campo legado 'pdfs' para limpar o banco gradualmente se desejado,
-    // ou mantém se a interface ainda o exigir (no caso removemos do objeto salvo)
-    // delete (dataToSave as any).pdfs;
 
     const payload = {
         ...dataToSave,

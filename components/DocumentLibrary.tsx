@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
-import { Link, Trash2, FileText, ExternalLink, Plus, Search, File } from 'lucide-react';
+import { Link, Trash2, FileText, ExternalLink, Plus, Search, File, Star } from 'lucide-react';
 import { DocumentItem } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import RichTextEditor from './RichTextEditor';
 
 interface DocumentLibraryProps {
   documents: DocumentItem[];
@@ -25,7 +27,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
   // Filter Documents
   const filteredDocs = documents.filter(d => 
     d.title.toLowerCase().includes(searchQuery.toLowerCase())
-  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  ).sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +48,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
       title: newTitle,
       url: newUrl,
       createdAt: new Date().toISOString(),
-      notes: ''
+      notes: '',
+      isFavorite: false
     };
 
     onAddDocument(newDoc);
@@ -57,6 +63,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
     if (selectedDoc) {
       onUpdateDocument({ ...selectedDoc, notes: text });
     }
+  };
+
+  const toggleFavorite = (e: React.MouseEvent, doc: DocumentItem) => {
+      e.stopPropagation();
+      onUpdateDocument({ ...doc, isFavorite: !doc.isFavorite });
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -141,6 +152,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                     <h3 className={`font-bold text-sm truncate ${selectedDocId === doc.id ? 'text-app-text' : 'text-app-text'}`}>{doc.title}</h3>
                     <span className="text-[10px] text-app-subtext">{format(new Date(doc.createdAt), "d MMM, HH:mm", { locale: ptBR })}</span>
                  </div>
+                 
+                 <button 
+                    onClick={(e) => toggleFavorite(e, doc)}
+                    className={`transition-colors ${doc.isFavorite ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold opacity-0 group-hover:opacity-100'}`}
+                 >
+                    <Star size={16} className={doc.isFavorite ? "fill-app-gold" : ""} />
+                 </button>
+
                  <button 
                     onClick={(e) => handleDelete(e, doc.id)}
                     className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
@@ -165,9 +184,12 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
               {/* Header */}
               <div className="p-4 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2 bg-app-card border border-app-border rounded flex-shrink-0">
-                        <File size={20} className="text-app-gold"/>
-                    </div>
+                    <button 
+                        onClick={(e) => toggleFavorite(e, selectedDoc)}
+                        className={`p-2 bg-app-card border border-app-border rounded flex-shrink-0 transition-colors ${selectedDoc.isFavorite ? 'border-app-gold' : ''}`}
+                    >
+                        <Star size={20} className={`${selectedDoc.isFavorite ? 'text-app-gold fill-app-gold' : 'text-app-subtext'}`} />
+                    </button>
                     <div className="min-w-0">
                         <h2 className="text-base font-bold text-app-text truncate">{selectedDoc.title}</h2>
                         <a href={selectedDoc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-app-subtext hover:text-app-gold truncate block hover:underline">
@@ -195,12 +217,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                         Adicionado em {format(new Date(selectedDoc.createdAt), "d 'de' MMMM", { locale: ptBR })}
                     </span>
                  </div>
-                 <textarea 
-                    value={selectedDoc.notes}
-                    onChange={(e) => handleNotesChange(e.target.value)}
-                    placeholder="Registre aqui seus aprendizados, citações importantes e resumos sobre este material..."
-                    className="flex-1 w-full bg-transparent p-6 text-sm md:text-base text-app-text outline-none resize-none leading-relaxed selection:bg-app-red selection:text-white"
-                 />
+                 <div className="flex-1 flex flex-col overflow-hidden">
+                    <RichTextEditor 
+                        content={selectedDoc.notes}
+                        onChange={handleNotesChange}
+                        placeholder="Registre aqui seus aprendizados, citações importantes e resumos sobre este material..."
+                        className="h-full border-none rounded-none"
+                    />
+                 </div>
               </div>
            </div>
         )}

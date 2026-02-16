@@ -100,6 +100,7 @@ export interface Transaction {
   type: 'ganho' | 'despesa';
   amount: number;
   description: string;
+  category?: string; // Campo opcional para suportar registros antigos
   created_at: string;
 }
 

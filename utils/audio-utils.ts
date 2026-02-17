@@ -1,4 +1,5 @@
 
+
 // Utilitários para manipular áudio PCM cru (16-bit, Little Endian)
 
 export function base64ToUint8Array(base64: string): Uint8Array {
@@ -11,7 +12,7 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+export function arrayBufferToBase64(buffer: ArrayBufferLike): string {
   let binary = '';
   const bytes = new Uint8Array(buffer);
   const len = bytes.byteLength;
@@ -27,7 +28,7 @@ export async function decodeAudioData(
   sampleRate: number = 24000,
   numChannels: number = 1
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.length / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 

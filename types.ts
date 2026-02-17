@@ -1,4 +1,5 @@
 
+
 export enum Priority {
   LOW = 'LOW',
   MODERATE = 'MODERATE',
@@ -164,6 +165,11 @@ export interface EvolutionState {
   level3?: Level3State;
 }
 
+export interface MentorState {
+  count: number;
+  lastUsageDate: string; // YYYY-MM-DD baseado na regra de 01:00 AM
+}
+
 export interface AppState {
   user: User | null;
   goals: Goal[];
@@ -180,6 +186,7 @@ export interface AppState {
   };
   timer?: ExecutionTimer;
   evolution?: EvolutionState;
+  mentor?: MentorState; // Novo estado do mentor
   
   // Campo legado opcional para evitar erros na migração imediata
   pdfs?: MediaFile[]; 

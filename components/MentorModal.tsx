@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Zap, Volume2, StopCircle, Lock } from 'lucide-react';
+import { X, Mic, Zap, Volume2, StopCircle, Lock, Clock } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { base64ToUint8Array, decodeAudioData, arrayBufferToBase64, downsampleTo16000 } from '../utils/audio-utils';
 
@@ -13,6 +13,7 @@ interface MentorModalProps {
 }
 
 const MAX_SESSIONS = 3;
+const MAX_DURATION_SECONDS = 90; // 1 minuto e 30 segundos
 
 // Configuração do Sistema (Identidade e Conhecimento do Mentor)
 const SYSTEM_INSTRUCTION = `
@@ -53,6 +54,10 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   const [isSpeaking, setIsSpeaking] = useState(false); // O Mentor está falando?
   const [error, setError] = useState<string | null>(null);
   
+  // Controle de Tempo
+  const [timeLeft, setTimeLeft] = useState(MAX_DURATION_SECONDS);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Refs para Web Audio e API
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -71,11 +76,24 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     return () => handleDisconnect();
   }, [isOpen]);
 
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   const handleDisconnect = () => {
     setIsActive(false);
     setIsConnecting(false);
     setIsSpeaking(false);
     setError(null);
+    
+    // Limpar timer
+    if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+    }
+    setTimeLeft(MAX_DURATION_SECONDS); // Reseta visualmente
 
     // Parar inputs
     if (processorRef.current) {
@@ -117,9 +135,23 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     try {
       setIsConnecting(true);
       setError(null);
+      setTimeLeft(MAX_DURATION_SECONDS);
       
       // Notifica o app que uma sessão começou (decrementa o contador)
       if (onSessionStart) onSessionStart();
+
+      // INICIA O CRONÔMETRO DE DESCONEXÃO AUTOMÁTICA
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = setInterval(() => {
+          setTimeLeft((prev) => {
+              if (prev <= 1) {
+                  clearInterval(timerIntervalRef.current!);
+                  handleDisconnect(); // Auto-kill
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
 
       // 1. Inicializar Audio Context (Sem forçar sampleRate, deixa o sistema decidir para evitar bugs)
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -280,9 +312,17 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
           <X size={32} />
         </button>
 
-        {/* Status Indicator */}
+        {/* Status Indicator & Timer */}
         <div className="absolute top-10 flex flex-col items-center gap-2">
             <h2 className="text-app-text font-bold text-lg uppercase tracking-widest opacity-80">Mentor IA</h2>
+            
+            {/* Countdown Display */}
+            {isActive && !error && (
+                <div className={`text-2xl font-mono font-bold tracking-widest ${timeLeft < 10 ? 'text-app-red animate-pulse' : 'text-app-text'}`}>
+                    {formatTime(timeLeft)}
+                </div>
+            )}
+
             {error ? (
                 <span className="text-app-red text-xs bg-red-900/20 px-3 py-1 rounded border border-app-red/50 text-center max-w-xs">{error}</span>
             ) : isActive ? (
@@ -352,7 +392,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                     isSpeaking ? (
                         <p className="text-app-gold font-bold text-lg animate-pulse">O Mentor está falando...</p>
                     ) : (
-                        <p className="text-white font-medium text-lg">Estou ouvindo. Pode falar.</p>
+                        <div className="flex flex-col items-center gap-1">
+                             <p className="text-white font-medium text-lg">Estou ouvindo. Pode falar.</p>
+                             <p className="text-app-subtext text-[10px] uppercase flex items-center gap-1">
+                                <Clock size={10} /> Tempo restante: {formatTime(timeLeft)}
+                             </p>
+                        </div>
                     )
                 ) : (
                     <p className="text-app-subtext text-sm max-w-xs mx-auto">

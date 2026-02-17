@@ -1,13 +1,18 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, Zap, Volume2, StopCircle } from 'lucide-react';
+import { X, Mic, Zap, Volume2, StopCircle, Lock } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { base64ToUint8Array, decodeAudioData, arrayBufferToBase64, downsampleTo16000 } from '../utils/audio-utils';
 
 interface MentorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  sessionsUsed?: number;
+  onSessionStart?: () => void;
 }
+
+const MAX_SESSIONS = 3;
 
 // Configuração do Sistema (Identidade e Conhecimento do Mentor)
 const SYSTEM_INSTRUCTION = `
@@ -42,7 +47,7 @@ REGRAS TÉCNICAS:
 - Não mencione "lista", "tópicos" ou formatação de texto.
 `;
 
-const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
+const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed = 0, onSessionStart }) => {
   const [isActive, setIsActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false); // O Mentor está falando?
@@ -56,6 +61,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
   const nextStartTimeRef = useRef<number>(0);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const sessionRef = useRef<any>(null); // Sessão do Gemini Live
+
+  const isBlocked = sessionsUsed >= MAX_SESSIONS;
 
   useEffect(() => {
     if (!isOpen) {
@@ -105,9 +112,14 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
   };
 
   const startSession = async () => {
+    if (isBlocked) return; // Segurança extra
+
     try {
       setIsConnecting(true);
       setError(null);
+      
+      // Notifica o app que uma sessão começou (decrementa o contador)
+      if (onSessionStart) onSessionStart();
 
       // 1. Inicializar Audio Context (Sem forçar sampleRate, deixa o sistema decidir para evitar bugs)
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -279,7 +291,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
                     <span className="text-green-500 text-xs font-bold uppercase tracking-wide">Online</span>
                 </div>
             ) : (
-                <span className="text-app-subtext text-xs uppercase tracking-wide">Desconectado</span>
+                <span className="text-app-subtext text-xs uppercase tracking-wide">
+                    {isBlocked ? "Acesso Diário Bloqueado" : "Desconectado"}
+                </span>
             )}
         </div>
 
@@ -298,16 +312,20 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
                 {/* Main Button Container */}
                 <button 
                     onClick={isActive ? handleDisconnect : startSession}
-                    disabled={isConnecting}
+                    disabled={isConnecting || isBlocked}
                     className={`
-                        relative w-32 h-32 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 transform hover:scale-105
-                        ${isActive 
-                            ? (isSpeaking ? 'bg-app-gold border-4 border-white shadow-[0_0_50px_rgba(255,215,0,0.4)]' : 'bg-app-red border-4 border-app-input shadow-[0_0_30px_rgba(229,9,20,0.4)]')
-                            : 'bg-app-card border border-app-subtext hover:border-app-text'
+                        relative w-32 h-32 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 transform
+                        ${isBlocked 
+                            ? 'bg-app-input border-4 border-app-border cursor-not-allowed opacity-50 grayscale'
+                            : (isActive 
+                                ? (isSpeaking ? 'bg-app-gold border-4 border-white shadow-[0_0_50px_rgba(255,215,0,0.4)]' : 'bg-app-red border-4 border-app-input shadow-[0_0_30px_rgba(229,9,20,0.4)]')
+                                : 'bg-app-card border border-app-subtext hover:border-app-text hover:scale-105')
                         }
                     `}
                 >
-                    {isConnecting ? (
+                    {isBlocked ? (
+                        <Lock size={40} className="text-app-subtext" />
+                    ) : isConnecting ? (
                         <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : isActive ? (
                         isSpeaking ? (
@@ -323,7 +341,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
             {/* Instruction Text */}
             <div className="mt-12 text-center h-20 flex flex-col justify-center">
-                {isConnecting ? (
+                {isBlocked ? (
+                    <div className="flex flex-col gap-1">
+                        <p className="text-app-red font-bold text-lg uppercase tracking-wider">Limite Atingido</p>
+                        <p className="text-app-subtext text-xs">Suas 3 sessões de hoje acabaram.<br/>O acesso reinicia às 01:00 da manhã.</p>
+                    </div>
+                ) : isConnecting ? (
                     <p className="text-app-subtext animate-pulse text-sm">Estabelecendo conexão segura...</p>
                 ) : isActive ? (
                     isSpeaking ? (
@@ -336,6 +359,17 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
                         Toque no microfone para iniciar a sessão de mentoria por voz.
                     </p>
                 )}
+            </div>
+
+            {/* Session Counter */}
+            <div className="absolute bottom-20 flex items-center gap-2">
+                {[1, 2, 3].map(i => (
+                    <div 
+                        key={i} 
+                        className={`w-3 h-3 rounded-full border border-app-subtext/50 transition-colors ${i <= sessionsUsed ? 'bg-app-gold border-app-gold' : 'bg-transparent'}`}
+                    ></div>
+                ))}
+                <span className="text-[10px] text-app-subtext uppercase ml-2">{sessionsUsed}/3 SESSÕES HOJE</span>
             </div>
 
         </div>

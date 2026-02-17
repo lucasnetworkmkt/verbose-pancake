@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -401,6 +402,16 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
     );
 };
 
+// --- Helper para o "Dia Lógico" (01:00 AM) ---
+const getLogicalDate = () => {
+    const now = new Date();
+    // Se for antes da 1 da manhã, ainda conta como o dia anterior
+    if (now.getHours() < 1) {
+        now.setDate(now.getDate() - 1);
+    }
+    return format(now, 'yyyy-MM-dd');
+};
+
 // --- Main App Logic ---
 
 function App() {
@@ -704,6 +715,36 @@ function App() {
     }
   };
 
+  // --- Mentor Session Management ---
+  const handleMentorSessionStart = () => {
+    setAppState(prev => {
+        if (!prev) return null;
+        const logicalDay = getLogicalDate();
+        let currentCount = prev.mentor?.count || 0;
+        
+        // Se a data do último uso for diferente do dia lógico atual, reseta para 0
+        if (prev.mentor?.lastUsageDate !== logicalDay) {
+            currentCount = 0;
+        }
+
+        return {
+            ...prev,
+            mentor: {
+                count: currentCount + 1,
+                lastUsageDate: logicalDay
+            }
+        };
+    });
+  };
+
+  // Calcula a contagem atual para passar ao modal (apenas visualização)
+  const getCurrentMentorSessionCount = () => {
+    if (!appState?.mentor) return 0;
+    const logicalDay = getLogicalDate();
+    if (appState.mentor.lastUsageDate !== logicalDay) return 0;
+    return appState.mentor.count;
+  };
+
   // --- Render ---
 
   if (!appState) {
@@ -779,7 +820,15 @@ function App() {
     <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
-      <MentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
+      
+      {/* Mentor Modal com controle de sessões */}
+      <MentorModal 
+        isOpen={showMentorModal} 
+        onClose={() => setShowMentorModal(false)} 
+        sessionsUsed={getCurrentMentorSessionCount()}
+        onSessionStart={handleMentorSessionStart}
+      />
+
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
 
       {/* MOBILE NAV OVERLAY */}

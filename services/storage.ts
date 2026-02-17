@@ -1,4 +1,5 @@
 
+
 import { AppState, User, MediaFile } from '../types';
 import { supabase } from './supabase';
 
@@ -29,6 +30,10 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
       lastCompletionDate: null,
       completedDays: []
     }
+  },
+  mentor: {
+    count: 0,
+    lastUsageDate: ''
   }
 });
 
@@ -118,6 +123,11 @@ export const authService = {
             notes: f.notes || '',
             isFavorite: f.is_favorite || false
         }));
+    }
+
+    // Garantir inicialização do objeto mentor se não existir (para usuários antigos)
+    if (!appStateData.mentor) {
+        appStateData.mentor = { count: 0, lastUsageDate: '' };
     }
 
     // Fallback: Se tiver arquivos no JSON antigo (legado), junta eles, mas preferência para a tabela nova

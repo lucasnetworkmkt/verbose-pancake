@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   // Carrega variáveis de ambiente do diretório atual.
   // O terceiro parâmetro '' diz ao Vite para carregar TODAS as variáveis, 
   // não apenas as que começam com VITE_.
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, '.', '');
 
   return {
     plugins: [react()],

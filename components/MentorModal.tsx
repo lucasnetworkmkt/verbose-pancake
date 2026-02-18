@@ -12,7 +12,7 @@ interface MentorModalProps {
 }
 
 const MAX_SESSIONS = 3;
-const MAX_DURATION_SECONDS = 180; // Mantido 3 minutos conforme solicitado anteriormente (ou pode ser 60s se preferir o original estrito)
+const MAX_DURATION_SECONDS = 180;
 
 const SYSTEM_INSTRUCTION = `
 Você é o MENTOR DO CÓDIGO DA EVOLUÇÃO.
@@ -46,21 +46,17 @@ REGRAS TÉCNICAS:
 - Não mencione "lista", "tópicos" ou formatação de texto.
 `;
 
-// Máquina de Estados para a Conexão
 type ConnectionStatus = 'IDLE' | 'MIC_ACCESS' | 'API_CONNECTING' | 'CONNECTED' | 'ERROR';
 
 const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed = 0, onSessionStart }) => {
-  // Estados Visuais
   const [status, setStatus] = useState<ConnectionStatus>('IDLE');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MAX_DURATION_SECONDS);
 
-  // Refs de Controle de Ciclo de Vida (Evita Race Conditions)
-  const connectionIdRef = useRef<number>(0); // ID único para cada tentativa de conexão
+  const connectionIdRef = useRef<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
 
-  // Refs de Áudio e API
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -71,7 +67,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
   const isBlocked = sessionsUsed >= MAX_SESSIONS;
 
-  // Cleanup ao desmontar ou fechar
   useEffect(() => {
     if (!isOpen) {
       hardCleanup();
@@ -79,13 +74,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     return () => hardCleanup();
   }, [isOpen]);
 
-  // Timer Effect
   useEffect(() => {
     if (status === 'CONNECTED') {
         timerIntervalRef.current = window.setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    handleDisconnect(); // Timeout natural
+                    handleDisconnect();
                     return 0;
                 }
                 return prev - 1;
@@ -105,18 +99,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Limpeza profunda e garantida
   const hardCleanup = () => {
-    // 1. Invalidar tentativa de conexão atual
     connectionIdRef.current = 0;
-
-    // 2. Parar Timer
     if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
     }
-
-    // 3. Parar Processamento de Microfone (Input)
     if (processorRef.current) {
         processorRef.current.disconnect();
         processorRef.current.onaudioprocess = null;
@@ -130,29 +118,19 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
     }
-
-    // 4. Parar Reprodução de Áudio (Output)
     activeSourcesRef.current.forEach(source => {
         try { source.stop(); } catch(e) {}
     });
     activeSourcesRef.current = [];
-
-    // 5. Fechar Contexto de Áudio
     if (audioContextRef.current) {
         try { audioContextRef.current.close(); } catch(e) {}
         audioContextRef.current = null;
     }
-
-    // 6. Fechar Sessão API
     if (sessionRef.current) {
         try { sessionRef.current.close(); } catch(e) {}
         sessionRef.current = null;
     }
-
-    // 7. Resetar Estados Visuais
     setIsSpeaking(false);
-    // Nota: Não resetamos 'status' aqui se for fechamento do modal, 
-    // pois o useEffect([isOpen]) cuidará disso ou o componente será desmontado.
     if (isOpen) { 
         setStatus('IDLE');
         setTimeLeft(MAX_DURATION_SECONDS);
@@ -166,11 +144,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
   const startSession = async () => {
     if (isBlocked) return;
-    
-    // Garante limpeza anterior
     hardCleanup();
-    
-    // Gera ID único para esta tentativa
     const myConnectionId = Date.now();
     connectionIdRef.current = myConnectionId;
 
@@ -178,31 +152,28 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         setErrorMsg(null);
         setStatus('MIC_ACCESS');
 
-        // PASSO 1: Obter Permissão de Microfone PRIMEIRO
-        // Isso evita criar AudioContext se o usuário negar permissão
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 channelCount: 1,
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
-                sampleRate: 16000
+                // Removido sampleRate fixo para compatibilidade com Safari/Mobile
             }
         });
 
-        // Verifica se foi cancelado
         if (connectionIdRef.current !== myConnectionId) {
             stream.getTracks().forEach(t => t.stop());
             return;
         }
         mediaStreamRef.current = stream;
 
-        // PASSO 2: Inicializar Audio Context
         setStatus('API_CONNECTING');
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioContextClass({ sampleRate: 24000 }); // Output em 24k para melhor qualidade
+        // CRÍTICO: Removido { sampleRate: 24000 } para evitar erro de hardware.
+        // O navegador decide a taxa nativa (geralmente 44.1k ou 48k).
+        const ctx = new AudioContextClass(); 
         
-        // CRÍTICO: Forçar resume para contornar políticas de autoplay
         await ctx.resume();
         
         if (connectionIdRef.current !== myConnectionId) {
@@ -212,9 +183,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         audioContextRef.current = ctx;
         nextStartTimeRef.current = ctx.currentTime;
 
-        // PASSO 3: Conectar API Gemini
         const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("Chave de API não configurada.");
+        if (!apiKey) throw new Error("API Key não encontrada. Verifique .env.");
 
         const ai = new GoogleGenAI({ apiKey });
         
@@ -229,30 +199,27 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
             },
             callbacks: {
                 onopen: () => {
-                    // Só considera conectado se o ID ainda bater
                     if (connectionIdRef.current === myConnectionId) {
                         console.log("Sessão Gemini Aberta");
                         setStatus('CONNECTED');
                         if (onSessionStart) onSessionStart();
-                        
-                        // Agora sim ligamos o fluxo de áudio
                         connectAudioFlow(ctx, stream, sessionPromise, myConnectionId);
                     } else {
-                        // Se foi cancelado, fecha a sessão que acabou de abrir
                         sessionPromise.then(s => s.close());
                     }
                 },
                 onmessage: async (msg: LiveServerMessage) => {
                     if (connectionIdRef.current !== myConnectionId) return;
-
-                    // Áudio recebido do modelo
+                    
                     const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                     if (audioData) {
                         try {
+                            // Decodifica dizendo que o audio VEM como 24k (padrão Gemini)
+                            // O ctx (ex: 48k) vai tocar corretamente fazendo resampling interno
                             const audioBuffer = await decodeAudioData(
                                 base64ToUint8Array(audioData),
                                 ctx,
-                                24000
+                                24000 
                             );
                             queueAudioResponse(ctx, audioBuffer, myConnectionId);
                         } catch (e) {
@@ -260,9 +227,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                         }
                     }
 
-                    // Controle de Turno (Saber se o modelo parou de falar)
                     if (msg.serverContent?.turnComplete) {
-                        // Pequeno delay para garantir que o áudio terminou de tocar
                         setTimeout(() => {
                             if (connectionIdRef.current === myConnectionId && activeSourcesRef.current.length === 0) {
                                 setIsSpeaking(false);
@@ -286,10 +251,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
             }
         });
 
-        // Guarda a referência da sessão
         sessionRef.current = await sessionPromise;
 
-        // Verificação final pós-await
         if (connectionIdRef.current !== myConnectionId) {
             sessionRef.current.close();
         }
@@ -299,6 +262,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         if (connectionIdRef.current === myConnectionId) {
             if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
                 setErrorMsg("Permissão de microfone negada.");
+            } else if (e.message.includes("API Key")) {
+                setErrorMsg("Erro de Configuração (API Key).");
             } else {
                 setErrorMsg("Falha ao iniciar. Tente novamente.");
             }
@@ -313,11 +278,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     sessionPromise: Promise<any>,
     myConnectionId: number
   ) => {
-      // Cria source do microfone
       const source = ctx.createMediaStreamSource(stream);
       inputSourceRef.current = source;
 
-      // Cria processador (buffer size 4096 = ~250ms de latência, bom balanço)
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
@@ -326,12 +289,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
           const inputData = e.inputBuffer.getChannelData(0);
           
-          // Downsample para 16kHz (Requisito do Gemini)
+          // O ctx.sampleRate agora pode ser qualquer coisa (ex: 44100, 48000)
+          // A função downsampleTo16000 lida com isso corretamente
           const pcm16 = downsampleTo16000(inputData, ctx.sampleRate);
           const base64Audio = arrayBufferToBase64(pcm16.buffer);
 
           sessionPromise.then(session => {
-              // Checagem dupla antes de enviar
               if (connectionIdRef.current === myConnectionId) {
                   session.sendRealtimeInput({
                       media: {
@@ -344,7 +307,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       };
 
       source.connect(processor);
-      processor.connect(ctx.destination); // Necessário para o scriptProcessor rodar em alguns browsers, mesmo sem som
+      processor.connect(ctx.destination);
   };
 
   const queueAudioResponse = (ctx: AudioContext, buffer: AudioBuffer, myConnectionId: number) => {
@@ -357,8 +320,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       source.connect(ctx.destination);
 
       const now = ctx.currentTime;
-      // Garante que o áudio toque sequencialmente, sem atropelar
-      // Se nextStartTime ficou para trás (pausa longa), reseta para 'now'
       const startTime = Math.max(now, nextStartTimeRef.current);
       
       source.start(startTime);
@@ -369,7 +330,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       source.onended = () => {
           activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
           if (activeSourcesRef.current.length === 0) {
-              // Verifica se não há mais nada agendado muito próximo
               if (nextStartTimeRef.current <= ctx.currentTime + 0.1) {
                   setIsSpeaking(false);
               }
@@ -383,7 +343,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
       <div className="relative w-full h-full flex flex-col items-center justify-center max-w-md mx-auto p-6">
         
-        {/* Close Button */}
         <button 
           onClick={onClose}
           className="absolute top-6 right-6 text-app-subtext hover:text-white p-2 transition-colors z-20"
@@ -391,11 +350,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
           <X size={32} />
         </button>
 
-        {/* Status Indicator & Timer */}
         <div className="absolute top-10 flex flex-col items-center gap-2">
             <h2 className="text-app-text font-bold text-lg uppercase tracking-widest opacity-80">Mentor IA</h2>
             
-            {/* Status Display */}
             {status === 'CONNECTED' ? (
                 <div className="flex flex-col items-center gap-2">
                     <div className={`text-2xl font-mono font-bold tracking-widest ${timeLeft < 10 ? 'text-app-red animate-pulse' : 'text-app-text'}`}>
@@ -418,19 +375,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
             )}
         </div>
 
-        {/* Main Interaction Area */}
         <div className="flex-1 flex flex-col items-center justify-center w-full relative">
-            
-            {/* Visualizer Circles */}
             <div className="relative flex items-center justify-center">
-                {/* Speaking Wave */}
                 <div className={`absolute w-64 h-64 rounded-full transition-all duration-300 ${isSpeaking ? 'bg-app-gold/10 scale-110' : 'bg-transparent scale-100'}`}></div>
                 <div className={`absolute w-48 h-48 rounded-full transition-all duration-500 ${isSpeaking ? 'bg-app-gold/20 animate-pulse' : 'bg-transparent'}`}></div>
-                
-                {/* Listening Glow */}
                 <div className={`absolute w-64 h-64 rounded-full transition-all duration-300 ${status === 'CONNECTED' && !isSpeaking ? 'bg-app-red/5 scale-105' : 'bg-transparent'}`}></div>
 
-                {/* Main Button */}
                 <button 
                     onClick={status === 'CONNECTED' || status === 'MIC_ACCESS' || status === 'API_CONNECTING' ? handleDisconnect : startSession}
                     disabled={(status !== 'IDLE' && status !== 'CONNECTED' && status !== 'ERROR') || isBlocked}
@@ -460,7 +410,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                 </button>
             </div>
 
-            {/* Instruction Text */}
             <div className="mt-12 text-center h-20 flex flex-col justify-center">
                 {isBlocked ? (
                     <div className="flex flex-col gap-1">
@@ -489,7 +438,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                 )}
             </div>
 
-            {/* Session Counter */}
             <div className="absolute bottom-20 flex items-center gap-2">
                 {[1, 2, 3].map(i => (
                     <div 
@@ -502,7 +450,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
         </div>
 
-        {/* Footer Hint */}
         <div className="absolute bottom-8 text-center px-6">
             <div className="flex items-center justify-center gap-2 text-app-subtext opacity-50 text-[10px] uppercase tracking-widest">
                 <Zap size={12} />

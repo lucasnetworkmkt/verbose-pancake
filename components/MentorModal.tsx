@@ -65,6 +65,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   const nextStartTimeRef = useRef<number>(0);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const sessionRef = useRef<any>(null); // Sessão do Gemini Live
+  
+  // Ref para controlar estado de conexão sem depender de re-renders
+  const isConnectedRef = useRef(false);
 
   const isBlocked = sessionsUsed >= MAX_SESSIONS;
 
@@ -82,19 +85,20 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   };
 
   const handleDisconnect = () => {
+    // 1. Atualiza estado visual
     setIsActive(false);
     setIsConnecting(false);
     setIsSpeaking(false);
-    setError(null);
+    isConnectedRef.current = false;
     
-    // Limpar timer
+    // 2. Limpar timer
     if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
     }
-    setTimeLeft(MAX_DURATION_SECONDS); // Reseta visualmente
+    setTimeLeft(MAX_DURATION_SECONDS);
 
-    // Parar inputs
+    // 3. Parar processamento de microfone (Inputs)
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current.onaudioprocess = null;
@@ -109,57 +113,47 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       streamRef.current = null;
     }
 
-    // Parar outputs (áudio do mentor)
+    // 4. Parar áudio do Mentor (Outputs)
     activeSourcesRef.current.forEach(source => {
       try { source.stop(); } catch(e) {}
     });
     activeSourcesRef.current = [];
 
-    // Fechar contexto de áudio
+    // 5. Fechar Contexto de Áudio
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
+      try {
+        audioContextRef.current.close();
+      } catch (e) { console.error(e); }
       audioContextRef.current = null;
     }
 
-    // Fechar sessão do Gemini
+    // 6. Fechar Sessão Gemini
     if (sessionRef.current) {
-      sessionRef.current.close();
+      try {
+        sessionRef.current.close();
+      } catch (e) { console.error(e); }
       sessionRef.current = null;
     }
   };
 
   const startSession = async () => {
-    if (isBlocked) return; // Segurança extra
+    if (isBlocked) return; 
 
     try {
       setIsConnecting(true);
       setError(null);
       setTimeLeft(MAX_DURATION_SECONDS);
-      
-      // Notifica o app que uma sessão começou (decrementa o contador)
-      if (onSessionStart) onSessionStart();
+      isConnectedRef.current = true; // Marca intenção de conectar
 
-      // INICIA O CRONÔMETRO DE DESCONEXÃO AUTOMÁTICA
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = window.setInterval(() => {
-          setTimeLeft((prev) => {
-              if (prev <= 1) {
-                  if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                  handleDisconnect(); // Auto-kill
-                  return 0;
-              }
-              return prev - 1;
-          });
-      }, 1000);
-
-      // 1. Inicializar Audio Context (Sem forçar sampleRate, deixa o sistema decidir para evitar bugs)
+      // 1. Inicializar Audio Context com Resume explícito
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass(); 
+      await ctx.resume(); // CRUCIAL para evitar bloqueio de autoplay
       audioContextRef.current = ctx;
       nextStartTimeRef.current = ctx.currentTime;
 
       // 2. Conectar com Gemini
-      const apiKey = process.env.API_KEY; // Usando variável do .env
+      const apiKey = process.env.API_KEY;
       if (!apiKey) throw new Error("API Key não encontrada.");
 
       const ai = new GoogleGenAI({ apiKey });
@@ -169,23 +163,46 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } // Voz grave/autoritária
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } }
           },
           systemInstruction: SYSTEM_INSTRUCTION,
         },
         callbacks: {
           onopen: () => {
             console.log("Conexão com Mentor estabelecida.");
-            setIsConnecting(false);
-            setIsActive(true);
-            setupMicrophone(ctx, sessionPromise);
+            
+            // Só inicia a sessão e o timer se ainda estivermos "conectados" na visão do usuário
+            if (isConnectedRef.current) {
+                // Notifica o app (conta a sessão) APENAS quando conecta com sucesso
+                if (onSessionStart) onSessionStart();
+
+                // Inicia o Timer APENAS quando conecta
+                if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = window.setInterval(() => {
+                    setTimeLeft((prev) => {
+                        if (prev <= 1) {
+                            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                            handleDisconnect();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+
+                setIsConnecting(false);
+                setIsActive(true);
+                setupMicrophone(ctx, sessionPromise);
+            } else {
+                // Se o usuário cancelou durante a conexão, fecha tudo agora
+                sessionPromise.then(s => s.close());
+            }
           },
           onmessage: async (msg: LiveServerMessage) => {
-            // Processar áudio recebido do modelo
+            if (!isConnectedRef.current) return;
+
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData) {
               setIsSpeaking(true);
-              // O Gemini SEMPRE devolve 24kHz
               const audioBuffer = await decodeAudioData(
                 base64ToUint8Array(audioData), 
                 ctx, 
@@ -193,13 +210,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
               );
               playResponse(ctx, audioBuffer);
             }
-
-            if (msg.serverContent?.turnComplete) {
-               // Turno completo
-            }
           },
           onclose: () => {
-            console.log("Conexão encerrada.");
+            console.log("Conexão encerrada pelo servidor.");
             handleDisconnect();
           },
           onerror: (err) => {
@@ -210,19 +223,25 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         }
       });
 
-      // Guardar referência para poder fechar depois
-      sessionRef.current = await sessionPromise;
+      // Guardar referência
+      const session = await sessionPromise;
+      sessionRef.current = session;
+      
+      // Verificação pós-await: se o usuário cancelou enquanto esperava, fecha
+      if (!isConnectedRef.current) {
+          session.close();
+          sessionRef.current = null;
+      }
 
     } catch (e: any) {
       console.error(e);
       setError("Falha ao iniciar: " + (e.message || "Erro desconhecido"));
-      setIsConnecting(false);
+      handleDisconnect();
     }
   };
 
   const setupMicrophone = async (ctx: AudioContext, sessionPromise: Promise<any>) => {
     try {
-      // Captura áudio na taxa nativa do dispositivo para evitar falhas de hardware
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           channelCount: 1, 
@@ -231,30 +250,37 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
           autoGainControl: true
         } 
       });
+      
+      // Verifica se ainda estamos conectados antes de prosseguir
+      if (!isConnectedRef.current) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+      }
+
       streamRef.current = stream;
 
       const source = ctx.createMediaStreamSource(stream);
       inputSourceRef.current = source;
 
-      // ScriptProcessor para pegar raw data
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = async (e) => {
+        if (!isConnectedRef.current) return; // Não processa se desconectado
+
         const inputData = e.inputBuffer.getChannelData(0);
-        
-        // CRUCIAL: Downsample para 16kHz antes de enviar
-        // A API entende muito melhor 16kHz do que 44.1k/48k enviadas cruas
         const pcm16 = downsampleTo16000(inputData, ctx.sampleRate);
         const base64Audio = arrayBufferToBase64(pcm16.buffer);
 
         sessionPromise.then(session => {
-            session.sendRealtimeInput({
-                media: {
-                    mimeType: "audio/pcm;rate=16000", // Informa EXPLICITAMENTE que estamos mandando 16k
-                    data: base64Audio
-                }
-            });
+            if (isConnectedRef.current) { // Check final antes de enviar
+                session.sendRealtimeInput({
+                    media: {
+                        mimeType: "audio/pcm;rate=16000",
+                        data: base64Audio
+                    }
+                });
+            }
         });
       };
 
@@ -265,7 +291,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       console.error("Erro no microfone:", e);
       let msg = "Erro ao acessar microfone.";
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        msg = "Permissão negada. Ative o microfone no navegador.";
+        msg = "Permissão negada. Ative o microfone.";
       } else if (e.name === 'NotFoundError') {
         msg = "Nenhum microfone encontrado.";
       }
@@ -275,6 +301,8 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   };
 
   const playResponse = (ctx: AudioContext, buffer: AudioBuffer) => {
+    if (!isConnectedRef.current) return;
+
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);

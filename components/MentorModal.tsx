@@ -12,9 +12,9 @@ interface MentorModalProps {
 }
 
 const MAX_SESSIONS = 3;
-const MAX_DURATION_SECONDS = 60; // Voltando para o original (1 minuto)
+const MAX_DURATION_SECONDS = 180; // Mantendo o tempo que você queria (3 minutos) pois o erro não era o tempo.
 
-// Configuração do Sistema (Identidade e Conhecimento do Mentor)
+// Configuração do Sistema
 const SYSTEM_INSTRUCTION = `
 Você é o MENTOR DO CÓDIGO DA EVOLUÇÃO.
 Sua única função é orientar a execução prática do usuário através de voz.
@@ -48,52 +48,35 @@ REGRAS TÉCNICAS:
 `;
 
 const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed = 0, onSessionStart }) => {
+  // Estados Visuais
   const [isActive, setIsActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false); // O Mentor está falando?
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Controle de Tempo
   const [timeLeft, setTimeLeft] = useState(MAX_DURATION_SECONDS);
+
+  // Refs de Controle (Não causam re-render)
+  const isConnectedRef = useRef(false);
   const timerIntervalRef = useRef<number | null>(null);
   
-  // Refs para Web Audio e API
+  // Refs de Áudio e Sessão
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
-  const sessionRef = useRef<any>(null); // Sessão do Gemini Live
+  const sessionRef = useRef<any>(null);
 
   const isBlocked = sessionsUsed >= MAX_SESSIONS;
 
+  // Cleanup ao fechar modal
   useEffect(() => {
     if (!isOpen) {
       handleDisconnect();
     }
     return () => handleDisconnect();
   }, [isOpen]);
-
-  // Timer Effect (Classic Logic)
-  useEffect(() => {
-    if (isActive && timeLeft > 0) {
-        timerIntervalRef.current = window.setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    handleDisconnect();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-    } else {
-        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    }
-    return () => {
-        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, [isActive]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -102,19 +85,22 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   };
 
   const handleDisconnect = () => {
+    // 1. Flag de controle imediata
+    isConnectedRef.current = false;
+
+    // 2. Atualiza UI
     setIsActive(false);
     setIsConnecting(false);
     setIsSpeaking(false);
-    setError(null);
     
-    // Limpar timer
+    // 3. Limpa Timer
     if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
     }
     setTimeLeft(MAX_DURATION_SECONDS);
 
-    // Parar inputs
+    // 4. Limpa Áudio Inputs (Microfone)
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current.onaudioprocess = null;
@@ -129,45 +115,51 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       streamRef.current = null;
     }
 
-    // Parar outputs (áudio do mentor)
+    // 5. Limpa Áudio Outputs (Falas do Mentor)
     activeSourcesRef.current.forEach(source => {
       try { source.stop(); } catch(e) {}
     });
     activeSourcesRef.current = [];
 
-    // Fechar contexto de áudio
+    // 6. Fecha Contexto de Áudio
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
+      try { audioContextRef.current.close(); } catch(e) {}
       audioContextRef.current = null;
     }
 
-    // Fechar sessão do Gemini
+    // 7. Fecha Sessão Gemini
     if (sessionRef.current) {
-      sessionRef.current.close();
+      try { sessionRef.current.close(); } catch(e) {}
       sessionRef.current = null;
     }
   };
 
   const startSession = async () => {
-    if (isBlocked) return; // Segurança extra
+    if (isBlocked) return;
 
     try {
       setIsConnecting(true);
       setError(null);
       setTimeLeft(MAX_DURATION_SECONDS);
+      
+      // Marca intenção de conexão
+      isConnectedRef.current = true;
 
-      // 1. Inicializar Audio Context
+      // 1. Inicializa Audio Context e FORÇA RESUME (Crítico para navegadores)
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass(); 
+      await ctx.resume(); // <--- Isso corrige o "liga e desliga" causado por autoplay policy
+      
       audioContextRef.current = ctx;
       nextStartTimeRef.current = ctx.currentTime;
 
       // 2. Conectar com Gemini
       const apiKey = process.env.API_KEY; 
-      if (!apiKey) throw new Error("API Key não encontrada.");
+      if (!apiKey) throw new Error("API Key ausente.");
 
       const ai = new GoogleGenAI({ apiKey });
       
+      // Promessa da sessão
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
@@ -179,14 +171,26 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
         },
         callbacks: {
           onopen: () => {
-            console.log("Conexão com Mentor estabelecida.");
-            setIsConnecting(false);
-            setIsActive(true);
-            if (onSessionStart) onSessionStart(); // Conta a sessão ao conectar
-            setupMicrophone(ctx, sessionPromise);
+            console.log("Conectado.");
+            // Só ativa se o usuário não cancelou nesse meio tempo
+            if (isConnectedRef.current) {
+                setIsConnecting(false);
+                setIsActive(true);
+                
+                // Inicia contagem de sessão e timer
+                if (onSessionStart) onSessionStart();
+                startTimer();
+
+                // Liga microfone
+                setupMicrophone(ctx, sessionPromise);
+            } else {
+                // Se cancelou, fecha tudo
+                sessionPromise.then(s => s.close());
+            }
           },
           onmessage: async (msg: LiveServerMessage) => {
-            // Processar áudio recebido do modelo
+            if (!isConnectedRef.current) return;
+
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData) {
               setIsSpeaking(true);
@@ -197,27 +201,50 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
               );
               playResponse(ctx, audioBuffer);
             }
+            // Se o turno acabou, paramos a animação de fala após um delay
+            if (msg.serverContent?.turnComplete) {
+                setTimeout(() => {
+                    if (activeSourcesRef.current.length === 0) setIsSpeaking(false);
+                }, 500);
+            }
           },
           onclose: () => {
-            console.log("Conexão encerrada.");
+            console.log("Desconectado pelo servidor.");
             handleDisconnect();
           },
           onerror: (err) => {
-            console.error("Erro na sessão:", err);
-            setError("Erro de conexão. Tente novamente.");
+            console.error("Erro sessão:", err);
+            setError("Erro de conexão.");
             handleDisconnect();
           }
         }
       });
 
-      // Guardar referência para poder fechar depois
       sessionRef.current = await sessionPromise;
+      
+      // Verifica novamente se não foi cancelado durante o await
+      if (!isConnectedRef.current && sessionRef.current) {
+          sessionRef.current.close();
+      }
 
     } catch (e: any) {
       console.error(e);
-      setError("Falha ao iniciar: " + (e.message || "Erro desconhecido"));
-      setIsConnecting(false);
+      setError("Falha ao iniciar.");
+      handleDisconnect();
     }
+  };
+
+  const startTimer = () => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = window.setInterval(() => {
+        setTimeLeft((prev) => {
+            if (prev <= 1) {
+                handleDisconnect();
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
   };
 
   const setupMicrophone = async (ctx: AudioContext, sessionPromise: Promise<any>) => {
@@ -230,54 +257,58 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
           autoGainControl: true
         } 
       });
-      streamRef.current = stream;
 
+      // Se desconectou enquanto pedia permissão
+      if (!isConnectedRef.current) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+      }
+
+      streamRef.current = stream;
       const source = ctx.createMediaStreamSource(stream);
       inputSourceRef.current = source;
 
-      // ScriptProcessor para pegar raw data
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = async (e) => {
+        if (!isConnectedRef.current) return;
+
         const inputData = e.inputBuffer.getChannelData(0);
-        
-        // Downsample para 16kHz
         const pcm16 = downsampleTo16000(inputData, ctx.sampleRate);
         const base64Audio = arrayBufferToBase64(pcm16.buffer);
 
         sessionPromise.then(session => {
-            session.sendRealtimeInput({
-                media: {
-                    mimeType: "audio/pcm;rate=16000",
-                    data: base64Audio
-                }
-            });
+            if (isConnectedRef.current) {
+                session.sendRealtimeInput({
+                    media: {
+                        mimeType: "audio/pcm;rate=16000",
+                        data: base64Audio
+                    }
+                });
+            }
         });
       };
 
       source.connect(processor);
       processor.connect(ctx.destination);
 
-    } catch (e: any) {
-      console.error("Erro no microfone:", e);
-      let msg = "Erro ao acessar microfone.";
-      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        msg = "Permissão negada. Ative o microfone no navegador.";
-      } else if (e.name === 'NotFoundError') {
-        msg = "Nenhum microfone encontrado.";
-      }
-      setError(msg);
+    } catch (e) {
+      console.error("Erro Mic:", e);
+      setError("Sem acesso ao microfone.");
       handleDisconnect();
     }
   };
 
   const playResponse = (ctx: AudioContext, buffer: AudioBuffer) => {
+    if (!isConnectedRef.current) return;
+
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
 
     const now = ctx.currentTime;
+    // Pequeno ajuste para evitar sobreposição
     const startTime = Math.max(now, nextStartTimeRef.current);
     
     source.start(startTime);
@@ -288,9 +319,10 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
     source.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
       if (activeSourcesRef.current.length === 0) {
-        setTimeout(() => {
-            if (activeSourcesRef.current.length === 0) setIsSpeaking(false);
-        }, 200);
+         // Pequeno delay para garantir que não tem outro audio chegando
+         setTimeout(() => {
+             if (activeSourcesRef.current.length === 0) setIsSpeaking(false);
+         }, 200);
       }
     };
   };
@@ -329,7 +361,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                 </div>
             ) : (
                 <span className="text-app-subtext text-xs uppercase tracking-wide">
-                    {isBlocked ? "Acesso Diário Bloqueado" : "Desconectado"}
+                    {isBlocked ? "Acesso Diário Bloqueado" : "Pronto para Conectar"}
                 </span>
             )}
         </div>

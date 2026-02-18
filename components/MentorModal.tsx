@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Zap, Volume2, StopCircle, Lock, Clock } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
@@ -13,7 +12,7 @@ interface MentorModalProps {
 }
 
 const MAX_SESSIONS = 3;
-const MAX_DURATION_SECONDS = 90; // 1 minuto e 30 segundos
+const MAX_DURATION_SECONDS = 180; // 3 minutos
 
 // Configuração do Sistema (Identidade e Conhecimento do Mentor)
 const SYSTEM_INSTRUCTION = `
@@ -56,7 +55,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
   
   // Controle de Tempo
   const [timeLeft, setTimeLeft] = useState(MAX_DURATION_SECONDS);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   
   // Refs para Web Audio e API
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -142,10 +141,10 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
       // INICIA O CRONÔMETRO DE DESCONEXÃO AUTOMÁTICA
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = setInterval(() => {
+      timerIntervalRef.current = window.setInterval(() => {
           setTimeLeft((prev) => {
               if (prev <= 1) {
-                  clearInterval(timerIntervalRef.current!);
+                  if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
                   handleDisconnect(); // Auto-kill
                   return 0;
               }

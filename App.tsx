@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,7 +32,8 @@ import {
   ChevronDown,
   User as UserIcon,
   DollarSign,
-  Grid
+  Grid,
+  Loader2
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile } from './types';
 import { authService, dataService, fileService } from './services/storage';
@@ -48,6 +48,7 @@ import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
+import { supabase } from './services/supabase';
 
 // --- Subcomponents within App.tsx ---
 
@@ -423,6 +424,26 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
+  
+  // NEW: Loading State for Session Restoration
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // NEW: Restore session on mount
+  useEffect(() => {
+    const init = async () => {
+        try {
+            const restoredState = await authService.restoreSession();
+            if (restoredState) {
+                setAppState(restoredState);
+            }
+        } catch (error) {
+            console.error("Falha ao restaurar sessão:", error);
+        } finally {
+            setIsLoadingSession(false);
+        }
+    };
+    init();
+  }, []);
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -454,7 +475,8 @@ function App() {
     setAppState(state);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setAppState(null);
   };
 
@@ -746,6 +768,15 @@ function App() {
   };
 
   // --- Render ---
+
+  if (isLoadingSession) {
+      return (
+          <div className="min-h-screen bg-app-bg flex flex-col items-center justify-center text-app-subtext gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-app-gold" />
+              <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Carregando Sistema...</p>
+          </div>
+      );
+  }
 
   if (!appState) {
     return <AuthScreen onLogin={handleLogin} />;

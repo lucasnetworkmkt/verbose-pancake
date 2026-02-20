@@ -105,7 +105,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       // 2. Obter Microfone
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           autoGainControl: true,
@@ -119,7 +118,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
       
       // CRITICAL: Use sessionPromise to prevent ReferenceError in onopen
       const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -154,10 +153,18 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
                 setIsSpeaking(false);
              }
           },
-          onclose: () => disconnect(),
-          onerror: (err) => {
-            console.error(err);
-            setError("Erro na conexão");
+          onclose: (event: any) => {
+            console.log("Conexão fechada", event);
+            if (event && event.code === 1006) {
+                setError("Erro 1006: Conexão bloqueada. Se estiver no Vercel, verifique se a API Key tem restrições de site (HTTP Referrers) que estão bloqueando o domínio.");
+            } else if (event && event.code !== 1000 && event.code !== 1005) {
+                setError(`Conexão encerrada (${event.code}): ${event.reason || 'Sem motivo'}`);
+            }
+            disconnect();
+          },
+          onerror: (err: any) => {
+            console.error("Erro no socket:", err);
+            setError("Erro na conexão com o servidor de IA.");
             disconnect();
           }
         }
@@ -165,9 +172,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
       sessionRef.current = await sessionPromise;
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setError("Falha ao conectar. Verifique permissões.");
+      setError(e.message || "Falha ao conectar. Verifique permissões.");
       disconnect();
     }
   };

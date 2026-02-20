@@ -165,9 +165,9 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, sessionsUsed
 
       sessionRef.current = await sessionPromise;
 
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
-      setError(e.message || "Falha ao conectar. Verifique permissões.");
+      setError("Falha ao conectar. Verifique permissões.");
       disconnect();
     }
   };

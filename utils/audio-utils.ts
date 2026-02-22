@@ -26,7 +26,6 @@ export class AudioStreamer {
     
     const arrayBuffer = base64ToArrayBuffer(base64Data);
     
-    // The Gemini Live API returns 24kHz PCM 16-bit little-endian
     const view = new DataView(arrayBuffer);
     const length = arrayBuffer.byteLength / 2;
     const floatArray = new Float32Array(length);
@@ -83,18 +82,16 @@ export class AudioRecorder {
       this.processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         
-        // Convert Float32Array to Int16Array
         const pcmData = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
           let s = Math.max(-1, Math.min(1, inputData[i]));
           pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         
-        // Convert Int16Array to Base64
         const buffer = new ArrayBuffer(pcmData.length * 2);
         const view = new DataView(buffer);
         for (let i = 0; i < pcmData.length; i++) {
-          view.setInt16(i * 2, pcmData[i], true); // little-endian
+          view.setInt16(i * 2, pcmData[i], true);
         }
         
         let binary = '';

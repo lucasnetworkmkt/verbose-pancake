@@ -84,10 +84,31 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
       streamerRef.current.init();
 
+      // 1. Solicita permissão do microfone ANTES de conectar
+      try {
+        await recorderRef.current.start((base64Data) => {
+          if (sessionRef.current) {
+            sessionRef.current.then((session: any) => {
+              try {
+                session.sendRealtimeInput({
+                  media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+                });
+              } catch (e) {
+                console.error("Erro ao enviar áudio:", e);
+              }
+            }).catch(console.error);
+          }
+        });
+      } catch (err: any) {
+        console.error("Erro ao acessar microfone:", err);
+        throw new Error("Erro ao acessar o microfone. Verifique as permissões do navegador.");
+      }
+
+      // 2. Conecta na API Live
       const sessionPromise = aiRef.current.live.connect({
-        model: "gemini-2.5-flash-native-audio-preview-09-2025",
+        model: "gemini-2.5-flash-native-audio-preview-12-2025",
         callbacks: {
-          onopen: async () => {
+          onopen: () => {
             setIsConnected(true);
             setIsConnecting(false);
             incrementSessions();
@@ -102,14 +123,6 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
                 return prev - 1;
               });
             }, 1000);
-            
-            await recorderRef.current?.start((base64Data) => {
-              sessionPromise.then((session) => {
-                session.sendRealtimeInput({
-                  media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-                });
-              });
-            });
           },
           onmessage: async (message: LiveServerMessage) => {
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
@@ -129,12 +142,19 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
               setIsSpeaking(false);
             }
           },
-          onerror: (err) => {
+          onerror: (err: any) => {
             console.error("Live API Error:", err);
-            setError("Erro na conexão com o Mentor.");
+            setError("Erro na conexão: " + (err.message || JSON.stringify(err)));
             stopSession();
           },
-          onclose: () => {
+          onclose: (event: any) => {
+            console.log("Live API Closed:", event);
+            setIsConnected((prev) => {
+              if (prev) {
+                setError("A conexão foi encerrada pelo servidor.");
+              }
+              return false;
+            });
             stopSession();
           }
         },
@@ -162,6 +182,7 @@ Seja conciso e direto ao ponto.`,
       console.error(err);
       setError(err.message || "Falha ao iniciar a sessão.");
       setIsConnecting(false);
+      stopSession();
     }
   };
 

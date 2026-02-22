@@ -9,23 +9,66 @@ interface MentorModalProps {
 }
 
 const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
+  const MAX_SESSIONS = 3;
+  const MAX_TIME_SECONDS = 90;
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sessionsUsed, setSessionsUsed] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(MAX_TIME_SECONDS);
   
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
   const streamerRef = useRef<AudioStreamer | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      const today = new Date().toISOString().split('T')[0];
+      const stored = localStorage.getItem('mentor_sessions');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.date === today) {
+            setSessionsUsed(parsed.count);
+          } else {
+            setSessionsUsed(0);
+          }
+        } catch (e) {
+          setSessionsUsed(0);
+        }
+      } else {
+        setSessionsUsed(0);
+      }
+    } else {
       stopSession();
     }
   }, [isOpen]);
 
+  const incrementSessions = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setSessionsUsed(prev => {
+      const newCount = prev + 1;
+      localStorage.setItem('mentor_sessions', JSON.stringify({ date: today, count: newCount }));
+      return newCount;
+    });
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   const startSession = async () => {
+    if (sessionsUsed >= MAX_SESSIONS) {
+      setError("Você atingiu o limite de 3 sessões por dia.");
+      return;
+    }
+
     try {
       setIsConnecting(true);
       setError(null);
@@ -47,6 +90,18 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
           onopen: async () => {
             setIsConnected(true);
             setIsConnecting(false);
+            incrementSessions();
+            setTimeLeft(MAX_TIME_SECONDS);
+            
+            timerRef.current = setInterval(() => {
+              setTimeLeft((prev) => {
+                if (prev <= 1) {
+                  stopSession();
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
             
             await recorderRef.current?.start((base64Data) => {
               sessionPromise.then((session) => {
@@ -111,6 +166,10 @@ Seja conciso e direto ao ponto.`,
   };
 
   const stopSession = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     if (sessionRef.current) {
       sessionRef.current.then((session: any) => session.close()).catch(console.error);
       sessionRef.current = null;
@@ -149,11 +208,23 @@ Seja conciso e direto ao ponto.`,
             </div>
             
             <h2 className="text-xl font-bold text-app-text mb-2 uppercase tracking-wider">Mentor Estratégico</h2>
-            <p className="text-app-subtext text-sm mb-8">
+            <p className="text-app-subtext text-sm mb-4">
               {isConnected 
                 ? "Conectado. Fale seu problema ou objetivo." 
                 : "Orientação direta, firme e focada em execução."}
             </p>
+
+            <div className="flex items-center justify-center gap-4 mb-8 w-full">
+              <div className="bg-app-input border border-app-border px-4 py-2 rounded text-xs text-app-subtext font-mono">
+                Sessões: <span className={sessionsUsed >= MAX_SESSIONS ? "text-app-red" : "text-app-text"}>{sessionsUsed}/{MAX_SESSIONS}</span>
+              </div>
+              {isConnected && (
+                <div className="bg-app-input border border-app-border px-4 py-2 rounded text-xs text-app-subtext font-mono flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${timeLeft <= 10 ? 'bg-app-red animate-pulse' : 'bg-app-gold'}`}></div>
+                  {formatTime(timeLeft)}
+                </div>
+              )}
+            </div>
             
             {error && (
               <div className="bg-red-900/30 border border-app-red text-app-red text-xs p-3 rounded mb-6 w-full text-left">

@@ -904,7 +904,7 @@ function App() {
                 {/* Mentor Help Button */}
                 <button onClick={() => setShowMentorModal(true)} className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-3 md:p-4 rounded flex items-center justify-center gap-2 md:gap-3 transition-all group shadow-sm hover:shadow-md">
                   <div className="p-1.5 md:p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors"><Mic size={16} className="md:w-5 md:h-5 text-app-gold group-hover:scale-110 transition-transform" /></div>
-                  <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Precisa de ajuda? Fale por voz com o mentor!</span>
+                  <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Mentor Estratégico</span>
                 </button>
 
                 {/* Today's Routines */}

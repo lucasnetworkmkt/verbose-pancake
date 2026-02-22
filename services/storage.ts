@@ -29,10 +29,6 @@ const createInitialState = (): Omit<AppState, 'user'> => ({
       lastCompletionDate: null,
       completedDays: []
     }
-  },
-  mentor: {
-    count: 0,
-    lastUsageDate: ''
   }
 });
 
@@ -74,70 +70,6 @@ export const fileService = {
 // --- AUTH & DATA SERVICES ---
 
 export const authService = {
-  restoreSession: async (): Promise<AppState | null> => {
-    // 1. Verifica se existe sessão ativa no Supabase (Local Storage)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user) return null;
-
-    const userId = session.user.id;
-
-    // 2. Buscar App Data (JSON Geral)
-    const { data: dbData, error: dbError } = await supabase
-      .from('app_data')
-      .select('data')
-      .eq('user_id', userId)
-      .single();
-
-    // 3. Buscar User Files (Tabela Dedicada)
-    const { data: filesData } = await supabase
-      .from('user_files')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (dbError && dbError.code !== 'PGRST116') { 
-        console.error("Erro ao restaurar dados:", dbError);
-    }
-
-    // Prepara estado inicial ou carrega do banco
-    const appStateData = dbData?.data || createInitialState();
-    
-    // Mapeia os arquivos
-    let loadedFiles: MediaFile[] = [];
-    if (filesData) {
-        loadedFiles = filesData.map((f: any) => ({
-            id: f.id,
-            fileName: f.file_name,
-            fileType: f.file_type,
-            mimeType: f.mime_type,
-            dataUrl: f.data_url,
-            uploadDate: f.created_at,
-            notes: f.notes || '',
-            isFavorite: f.is_favorite || false
-        }));
-    }
-
-    if (!appStateData.mentor) {
-        appStateData.mentor = { count: 0, lastUsageDate: '' };
-    }
-
-    if (!(appStateData.files && appStateData.files.length > 0)) {
-        appStateData.files = loadedFiles;
-    }
-
-    if (appStateData.settings && !appStateData.settings.theme) appStateData.settings.theme = 'dark';
-    
-    const user: User = {
-        id: userId,
-        username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Usuário',
-        email: session.user.email || '',
-        password: '', // Não recuperamos senha na sessão
-        avatarUrl: appStateData.user?.avatarUrl || '', 
-        createdAt: new Date(session.user.created_at).getTime()
-    };
-
-    return { ...appStateData, files: loadedFiles, user };
-  },
-
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -186,11 +118,6 @@ export const authService = {
             notes: f.notes || '',
             isFavorite: f.is_favorite || false
         }));
-    }
-
-    // Garantir inicialização do objeto mentor se não existir (para usuários antigos)
-    if (!appStateData.mentor) {
-        appStateData.mentor = { count: 0, lastUsageDate: '' };
     }
 
     // Fallback: Se tiver arquivos no JSON antigo (legado), junta eles, mas preferência para a tabela nova
@@ -247,6 +174,75 @@ export const authService = {
     }
 
     return { user, ...initialState };
+  },
+
+  restoreSession: async (): Promise<AppState | null> => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session || !session.user) {
+      return null;
+    }
+
+    const authUser = session.user;
+
+    // 2. Buscar App Data (JSON Geral)
+    const { data: dbData, error: dbError } = await supabase
+      .from('app_data')
+      .select('data')
+      .eq('user_id', authUser.id)
+      .single();
+
+    // 3. Buscar User Files (Tabela Dedicada)
+    const { data: filesData, error: filesError } = await supabase
+      .from('user_files')
+      .select('*')
+      .eq('user_id', authUser.id);
+
+    if (dbError && dbError.code !== 'PGRST116') { 
+        console.error("Erro ao buscar dados:", dbError);
+    }
+
+    // Prepara estado inicial ou carrega do banco
+    const appStateData = dbData?.data || createInitialState();
+    
+    // Mapeia os arquivos da tabela nova para o formato do AppState
+    let loadedFiles: MediaFile[] = [];
+    if (filesData) {
+        loadedFiles = filesData.map((f: any) => ({
+            id: f.id,
+            fileName: f.file_name,
+            fileType: f.file_type,
+            mimeType: f.mime_type,
+            dataUrl: f.data_url,
+            uploadDate: f.created_at,
+            notes: f.notes || '',
+            isFavorite: f.is_favorite || false
+        }));
+    }
+
+    if (appStateData.files && appStateData.files.length > 0) {
+        // Fallback
+    } else {
+        appStateData.files = loadedFiles;
+    }
+
+    // Migrações de segurança
+    if (appStateData.settings && !appStateData.settings.theme) appStateData.settings.theme = 'dark';
+    
+    const user: User = {
+        id: authUser.id,
+        username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'User',
+        email: authUser.email || '',
+        password: '', // We don't have the password on restore, but it's not needed for normal operation
+        avatarUrl: appStateData.user?.avatarUrl || '', 
+        createdAt: new Date(authUser.created_at).getTime()
+    };
+
+    return { ...appStateData, files: loadedFiles, user };
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut();
   }
 };
 

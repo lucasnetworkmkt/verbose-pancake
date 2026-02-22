@@ -52,11 +52,23 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
   const incrementSessions = () => {
     const today = new Date().toISOString().split('T')[0];
-    setSessionsUsed(prev => {
-      const newCount = prev + 1;
-      localStorage.setItem('mentor_sessions', JSON.stringify({ date: today, count: newCount }));
-      return newCount;
-    });
+    const stored = localStorage.getItem('mentor_sessions');
+    let currentCount = 0;
+    
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.date === today) {
+          currentCount = parsed.count;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    
+    const newCount = currentCount + 1;
+    localStorage.setItem('mentor_sessions', JSON.stringify({ date: today, count: newCount }));
+    setSessionsUsed(newCount);
   };
 
   const formatTime = (seconds: number) => {

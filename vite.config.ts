@@ -3,16 +3,22 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, (process as any).cwd(), '');
-
+  const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react()],
-    define: {
-      // Maneira correta e segura de expor a API Key no Vite para a lib do Google
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || env.VITE_API_KEY || env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
-    },
     server: {
       host: true
+    },
+    define: {
+      // Alguns pacotes dependem de process.env, isso evita que o build quebre
+      'process.env': {
+        API_KEY: JSON.stringify(env.API_KEY || process.env.API_KEY || ''),
+        GEMINI_API_KEY: JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.API_KEY || process.env.API_KEY || '')
+      }
+    },
+    build: {
+      // Aumenta o limite de aviso de tamanho de chunk para evitar warnings desnecessários
+      chunkSizeWarningLimit: 1000
     }
   };
 });

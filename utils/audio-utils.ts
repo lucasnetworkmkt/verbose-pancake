@@ -1,83 +1,134 @@
-
-
-// Utilitários para manipular áudio PCM cru (16-bit, Little Endian)
-
-export function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64);
+export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = window.atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  return bytes;
-}
+  return bytes.buffer;
+};
 
-export function arrayBufferToBase64(buffer: ArrayBufferLike): string {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
+export class AudioStreamer {
+  private audioContext: AudioContext | null = null;
+  private nextPlayTime: number = 0;
 
-export async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number = 24000,
-  numChannels: number = 1
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.length / 2);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      // Converte Int16 (-32768 a 32767) para Float32 (-1.0 a 1.0)
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+  init() {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext({ sampleRate: 24000 });
+    }
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
     }
   }
-  return buffer;
+
+  async playPcmData(base64Data: string) {
+    if (!this.audioContext) this.init();
+    
+    const arrayBuffer = base64ToArrayBuffer(base64Data);
+    
+    // The Gemini Live API returns 24kHz PCM 16-bit little-endian
+    const view = new DataView(arrayBuffer);
+    const length = arrayBuffer.byteLength / 2;
+    const floatArray = new Float32Array(length);
+    
+    for (let i = 0; i < length; i++) {
+      const int16 = view.getInt16(i * 2, true);
+      floatArray[i] = int16 / 32768;
+    }
+    
+    const audioBuffer = this.audioContext!.createBuffer(1, length, 24000);
+    audioBuffer.getChannelData(0).set(floatArray);
+    
+    const source = this.audioContext!.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.audioContext!.destination);
+    
+    const currentTime = this.audioContext!.currentTime;
+    if (this.nextPlayTime < currentTime) {
+      this.nextPlayTime = currentTime;
+    }
+    
+    source.start(this.nextPlayTime);
+    this.nextPlayTime += audioBuffer.duration;
+  }
+
+  stop() {
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.nextPlayTime = 0;
+  }
 }
 
-export function float32ToPCM16(float32Array: Float32Array): Int16Array {
-  const int16Array = new Int16Array(float32Array.length);
-  for (let i = 0; i < float32Array.length; i++) {
-    let s = Math.max(-1, Math.min(1, float32Array[i]));
-    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-  }
-  return int16Array;
-}
+export class AudioRecorder {
+  private audioContext: AudioContext | null = null;
+  private stream: MediaStream | null = null;
+  private processor: ScriptProcessorNode | null = null;
+  private source: MediaStreamAudioSourceNode | null = null;
 
-/**
- * Converte um buffer de áudio de qualquer taxa (ex: 44.1k/48k) para 16kHz.
- * Essencial para que o Gemini entenda a fala corretamente.
- */
-export function downsampleTo16000(buffer: Float32Array, sampleRate: number): Int16Array {
-  if (sampleRate === 16000) {
-    return float32ToPCM16(buffer);
+  async start(onData: (base64: string) => void) {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+        } 
+      });
+      
+      this.audioContext = new AudioContext({ sampleRate: 16000 });
+      this.source = this.audioContext.createMediaStreamSource(this.stream);
+      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+      
+      this.processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        
+        // Convert Float32Array to Int16Array
+        const pcmData = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          let s = Math.max(-1, Math.min(1, inputData[i]));
+          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        
+        // Convert Int16Array to Base64
+        const buffer = new ArrayBuffer(pcmData.length * 2);
+        const view = new DataView(buffer);
+        for (let i = 0; i < pcmData.length; i++) {
+          view.setInt16(i * 2, pcmData[i], true); // little-endian
+        }
+        
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = window.btoa(binary);
+        
+        onData(base64);
+      };
+      
+      this.source.connect(this.processor);
+      this.processor.connect(this.audioContext.destination);
+      
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      throw err;
+    }
   }
-  
-  const ratio = sampleRate / 16000;
-  const newLength = Math.round(buffer.length / ratio);
-  const result = new Int16Array(newLength);
-  
-  for (let i = 0; i < newLength; i++) {
-    const offset = i * ratio;
-    const index = Math.floor(offset);
-    const decimal = offset - index;
-    
-    // Interpolação linear simples para suavizar o áudio reduzido
-    const a = buffer[index] || 0;
-    const b = buffer[index + 1] || a;
-    const val = a + (b - a) * decimal;
-    
-    // Clamp e conversão para PCM 16-bit
-    let s = Math.max(-1, Math.min(1, val));
-    result[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+
+  stop() {
+    if (this.processor && this.audioContext) {
+      this.processor.disconnect();
+      this.source?.disconnect();
+    }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+    }
   }
-  
-  return result;
 }

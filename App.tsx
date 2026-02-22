@@ -32,8 +32,7 @@ import {
   ChevronDown,
   User as UserIcon,
   DollarSign,
-  Grid,
-  Loader2
+  Grid
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile } from './types';
 import { authService, dataService, fileService } from './services/storage';
@@ -48,7 +47,6 @@ import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
-import { supabase } from './services/supabase';
 
 // --- Subcomponents within App.tsx ---
 
@@ -403,16 +401,6 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
     );
 };
 
-// --- Helper para o "Dia Lógico" (01:00 AM) ---
-const getLogicalDate = () => {
-    const now = new Date();
-    // Se for antes da 1 da manhã, ainda conta como o dia anterior
-    if (now.getHours() < 1) {
-        now.setDate(now.getDate() - 1);
-    }
-    return format(now, 'yyyy-MM-dd');
-};
-
 // --- Main App Logic ---
 
 function App() {
@@ -424,26 +412,6 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
-  
-  // NEW: Loading State for Session Restoration
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
-
-  // NEW: Restore session on mount
-  useEffect(() => {
-    const init = async () => {
-        try {
-            const restoredState = await authService.restoreSession();
-            if (restoredState) {
-                setAppState(restoredState);
-            }
-        } catch (error) {
-            console.error("Falha ao restaurar sessão:", error);
-        } finally {
-            setIsLoadingSession(false);
-        }
-    };
-    init();
-  }, []);
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -475,8 +443,7 @@ function App() {
     setAppState(state);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     setAppState(null);
   };
 
@@ -737,46 +704,7 @@ function App() {
     }
   };
 
-  // --- Mentor Session Management ---
-  const handleMentorSessionStart = () => {
-    setAppState(prev => {
-        if (!prev) return null;
-        const logicalDay = getLogicalDate();
-        let currentCount = prev.mentor?.count || 0;
-        
-        // Se a data do último uso for diferente do dia lógico atual, reseta para 0
-        if (prev.mentor?.lastUsageDate !== logicalDay) {
-            currentCount = 0;
-        }
-
-        return {
-            ...prev,
-            mentor: {
-                count: currentCount + 1,
-                lastUsageDate: logicalDay
-            }
-        };
-    });
-  };
-
-  // Calcula a contagem atual para passar ao modal (apenas visualização)
-  const getCurrentMentorSessionCount = () => {
-    if (!appState?.mentor) return 0;
-    const logicalDay = getLogicalDate();
-    if (appState.mentor.lastUsageDate !== logicalDay) return 0;
-    return appState.mentor.count;
-  };
-
   // --- Render ---
-
-  if (isLoadingSession) {
-      return (
-          <div className="min-h-screen bg-app-bg flex flex-col items-center justify-center text-app-subtext gap-4">
-              <Loader2 className="w-10 h-10 animate-spin text-app-gold" />
-              <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Carregando Sistema...</p>
-          </div>
-      );
-  }
 
   if (!appState) {
     return <AuthScreen onLogin={handleLogin} />;
@@ -851,15 +779,7 @@ function App() {
     <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
-      
-      {/* Mentor Modal com controle de sessões */}
-      <MentorModal 
-        isOpen={showMentorModal} 
-        onClose={() => setShowMentorModal(false)} 
-        sessionsUsed={getCurrentMentorSessionCount()}
-        onSessionStart={handleMentorSessionStart}
-      />
-
+      <MentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
 
       {/* MOBILE NAV OVERLAY */}

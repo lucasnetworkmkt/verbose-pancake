@@ -77,6 +77,13 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const resetSessions = () => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('mentor_sessions', JSON.stringify({ date: today, count: 0 }));
+    setSessionsUsed(0);
+    setError(null);
+  };
+
   const startSession = async () => {
     if (sessionsUsed >= MAX_SESSIONS) {
       setError("Você atingiu o limite de 3 sessões por dia.");
@@ -259,8 +266,13 @@ Seja conciso e direto ao ponto.`,
             </p>
 
             <div className="flex items-center justify-center gap-4 mb-8 w-full">
-              <div className="bg-app-input border border-app-border px-4 py-2 rounded text-xs text-app-subtext font-mono">
+              <div className="bg-app-input border border-app-border px-4 py-2 rounded text-xs text-app-subtext font-mono flex items-center gap-2">
                 Sessões: <span className={sessionsUsed >= MAX_SESSIONS ? "text-app-red" : "text-app-text"}>{sessionsUsed}/{MAX_SESSIONS}</span>
+                {sessionsUsed >= MAX_SESSIONS && (
+                  <button onClick={resetSessions} className="ml-2 text-[10px] bg-app-border px-2 py-1 rounded hover:bg-app-subtext text-app-bg transition-colors">
+                    RESET
+                  </button>
+                )}
               </div>
               {isConnected && (
                 <div className="bg-app-input border border-app-border px-4 py-2 rounded text-xs text-app-subtext font-mono flex items-center gap-2">

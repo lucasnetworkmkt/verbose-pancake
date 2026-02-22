@@ -32,11 +32,24 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      chatRef.current = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: {
-          systemInstruction: `Você é um mentor estratégico focado em execução.
+      // Tenta pegar a chave de várias formas para garantir que funcione no Vercel
+      // Fallback direto para a chave fornecida pelo usuário para garantir funcionamento
+      const apiKey = import.meta.env.VITE_API_KEY || process.env.API_KEY || 'AIzaSyBs3JNZGCmq5VOnpDNrju8t15zVXWUQgRo';
+      console.log("Initializing Gemini with API Key length:", apiKey?.length);
+      
+      if (!apiKey || apiKey === 'undefined') {
+        setError("Erro: Chave da API não configurada. O Mentor não funcionará.");
+        return;
+      }
+      
+      try {
+        // Inicializa o SDK corretamente
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+        // Usa o modelo recomendado para chat
+        chatRef.current = ai.chats.create({
+          model: 'gemini-3-flash-preview',
+          config: {
+            systemInstruction: `Você é um mentor estratégico focado em execução.
 Seu papel é ajudar o usuário a superar bloqueios e agir.
 Siga esta lógica internamente (sem mencionar as etapas):
 1. Identificar o problema
@@ -47,8 +60,12 @@ Siga esta lógica internamente (sem mencionar as etapas):
 Tom: Direto, firme, estratégico, claro, profissional, sem motivação vazia, nunca ofensivo.
 Use como base os princípios de disciplina, foco, criação de hábitos e execução do Código da Evolução.
 Seja conciso e vá direto ao ponto.`,
-        }
-      });
+          }
+        });
+      } catch (err) {
+        console.error("Failed to initialize Gemini:", err);
+        setError("Erro ao inicializar o Mentor. Verifique as configurações.");
+      }
     } else {
       // Reset state when closed
       setMessages([{ role: 'model', content: 'Qual é o seu obstáculo hoje? Seja direto.' }]);
@@ -70,15 +87,27 @@ Seja conciso e vá direto ao ponto.`,
     setIsLoading(true);
 
     try {
+      console.log("Sending message to Gemini...");
       const response = await chatRef.current.sendMessage({ message: userMessage });
-      if (response.text) {
+      console.log("Received response from Gemini", response);
+      
+      if (response && response.text) {
         setMessages(prev => [...prev, { role: 'model', content: response.text }]);
       } else {
-        throw new Error("Resposta vazia");
+        throw new Error("Resposta vazia ou formato inválido");
       }
     } catch (err: any) {
       console.error("Mentor API Error:", err);
-      setError('Falha na comunicação com o Mentor. Verifique sua conexão e tente novamente.');
+      // Tratamento de erro mais amigável
+      let errorMessage = 'Falha na comunicação com o Mentor. Verifique sua conexão e tente novamente.';
+      if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+        errorMessage = 'Erro de autenticação: A chave da API do Google não é válida.';
+      } else if (err.status === 404 || err.message?.includes('not found')) {
+        errorMessage = 'Erro: Modelo não encontrado. Verifique a configuração do modelo.';
+      } else if (err.message) {
+        errorMessage = `Erro: ${err.message}`;
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -162,11 +191,11 @@ Seja conciso e vá direto ao ponto.`,
               placeholder="Descreva seu obstáculo atual..."
               className="flex-1 bg-app-input border border-app-border text-app-text p-3 rounded-lg focus:border-app-gold focus:outline-none transition-colors resize-none h-12 min-h-[48px] max-h-32 text-sm"
               rows={1}
-              disabled={isLoading}
+              disabled={isLoading || !chatRef.current}
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || !chatRef.current}
               className="bg-app-red hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-app-red text-white p-3 rounded-lg transition-colors flex items-center justify-center w-12 h-12"
             >
               <Send size={18} />

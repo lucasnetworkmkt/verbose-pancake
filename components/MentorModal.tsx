@@ -1,67 +1,46 @@
-Quero remover completamente a implementação atual do Mentor do Web App.
+import React from 'react';
+import { X, Rocket } from 'lucide-react';
 
-Contexto:
-O projeto é construído com Vite e está hospedado na Vercel.
+interface MentorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
 
-O Mentor anteriormente funcionava por link externo (iframe/redirecionamento). Agora ele não será lançado nesta versão.
+const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
 
-🔥 O QUE DEVE SER FEITO
-1️⃣ Remover completamente:
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-app-card border border-app-border rounded-lg shadow-2xl relative overflow-hidden">
+        {/* Close Button */}
+        <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 text-app-subtext hover:text-app-text transition-colors"
+        >
+            <X size={24} />
+        </button>
 
-Qualquer iframe relacionado ao Mentor
+        <div className="p-8 flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-app-gold/10 rounded-full flex items-center justify-center mb-6 text-app-gold">
+                <Rocket size={32} />
+            </div>
+            
+            <h2 className="text-xl font-bold text-app-text mb-4 uppercase tracking-wider">🚀 Mentor Estratégico</h2>
+            
+            <p className="text-app-subtext text-sm mb-8 leading-relaxed">
+                O Mentor por IA está em desenvolvimento e será lançado em uma futura atualização. Todos os membros atuais terão acesso automaticamente quando for liberado.
+            </p>
 
-Qualquer lógica de redirecionamento externo
+            <button 
+                onClick={onClose}
+                className="w-full bg-app-input hover:bg-app-hover border border-app-border text-app-text font-bold py-4 rounded uppercase tracking-widest transition-all shadow-sm"
+            >
+                Entendi
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-Funções inutilizadas relacionadas ao Mentor
-
-Imports não utilizados
-
-Estados e hooks que ficaram como “resto”
-
-Qualquer chamada de API relacionada ao Mentor
-
-Limpar o código para não deixar resíduos ou warnings.
-
-2️⃣ Manter o botão do Mentor no painel
-
-Quando o usuário clicar no botão do Mentor:
-
-Em vez de abrir iframe ou redirecionar, deve abrir um Card centralizado na tela com:
-
-Título:
-🚀 Mentor Estratégico
-
-Texto:
-“O Mentor por IA está em desenvolvimento e será lançado em uma futura atualização.
-Todos os membros atuais terão acesso automaticamente quando for liberado.”
-
-Botão:
-“Entendi”
-
-Ao clicar, apenas fecha o card.
-
-🎨 Design
-
-Seguir exatamente o mesmo padrão visual do Web App
-
-Minimalista
-
-Profissional
-
-Sem exageros visuais
-
-Responsivo
-
-⚙️ Importante
-
-Garantir que:
-
-O projeto compile sem erros
-
-Não existam variáveis órfãs
-
-Não existam imports não utilizados
-
-Não existam erros no build da Vercel
-
-O botão do Mentor continue visível no painel
+export default MentorModal;

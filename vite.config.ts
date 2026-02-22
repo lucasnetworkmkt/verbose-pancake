@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
       host: true
     },
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY || 'AIzaSyBs3JNZGCmq5VOnpDNrju8t15zVXWUQgRo')
     },
     build: {
       // Aumenta o limite de aviso de tamanho de chunk para evitar warnings desnecessários

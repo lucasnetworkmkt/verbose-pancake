@@ -405,6 +405,7 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
@@ -412,6 +413,22 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
+
+  useEffect(() => {
+    const restore = async () => {
+      try {
+        const state = await authService.restoreSession();
+        if (state) {
+          handleLogin(state);
+        }
+      } catch (error) {
+        console.error("Failed to restore session:", error);
+      } finally {
+        setIsRestoringSession(false);
+      }
+    };
+    restore();
+  }, []);
 
   useEffect(() => {
     if (appState && appState.user) {
@@ -443,7 +460,8 @@ function App() {
     setAppState(state);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authService.logout();
     setAppState(null);
   };
 
@@ -705,6 +723,17 @@ function App() {
   };
 
   // --- Render ---
+
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-app-border border-t-app-gold rounded-full animate-spin mb-4"></div>
+          <p className="text-app-subtext text-sm font-bold uppercase tracking-widest">Carregando Sessão...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!appState) {
     return <AuthScreen onLogin={handleLogin} />;

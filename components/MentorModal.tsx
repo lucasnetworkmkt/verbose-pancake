@@ -1,54 +1,67 @@
-import React from 'react';
-import { X, ExternalLink, AlertTriangle } from 'lucide-react';
+Quero remover completamente a implementação atual do Mentor do Web App.
 
-interface MentorModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+Contexto:
+O projeto é construído com Vite e está hospedado na Vercel.
 
-const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+O Mentor anteriormente funcionava por link externo (iframe/redirecionamento). Agora ele não será lançado nesta versão.
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-app-card border border-app-border rounded-lg shadow-2xl relative overflow-hidden">
-        {/* Close Button */}
-        <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 text-app-subtext hover:text-app-text transition-colors"
-        >
-            <X size={24} />
-        </button>
+🔥 O QUE DEVE SER FEITO
+1️⃣ Remover completamente:
 
-        <div className="p-8 flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center mb-6 text-yellow-500">
-                <AlertTriangle size={32} />
-            </div>
-            
-            <h2 className="text-xl font-bold text-app-text mb-6 uppercase tracking-wider">Aviso Importante</h2>
-            
-            <div className="text-left bg-app-input p-6 rounded border border-app-border mb-8 w-full">
-                <p className="text-app-subtext text-sm mb-4 font-bold text-center">⚠️ Antes de prosseguir, você precisa ter em mente que:</p>
-                <ul className="text-sm text-app-text space-y-3 list-disc pl-5 leading-relaxed">
-                    <li>Você pode falar com o Mentor apenas <strong className="text-app-text font-bold border-b border-app-gold">5 vezes por dia</strong></li>
-                    <li>Use essas 5 consultas com sabedoria</li>
-                    <li>Cada sessão de fala pode durar até 2 a 3 minutos</li>
-                </ul>
-            </div>
+Qualquer iframe relacionado ao Mentor
 
-            <a 
-                href="https://mentor-web-voiceapp.vercel.app/"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={onClose}
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-4 rounded uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg shadow-yellow-500/20"
-            >
-                CONSULTAR O MENTOR AGORA <ExternalLink size={16} />
-            </a>
-        </div>
-      </div>
-    </div>
-  );
-};
+Qualquer lógica de redirecionamento externo
 
-export default MentorModal;
+Funções inutilizadas relacionadas ao Mentor
+
+Imports não utilizados
+
+Estados e hooks que ficaram como “resto”
+
+Qualquer chamada de API relacionada ao Mentor
+
+Limpar o código para não deixar resíduos ou warnings.
+
+2️⃣ Manter o botão do Mentor no painel
+
+Quando o usuário clicar no botão do Mentor:
+
+Em vez de abrir iframe ou redirecionar, deve abrir um Card centralizado na tela com:
+
+Título:
+🚀 Mentor Estratégico
+
+Texto:
+“O Mentor por IA está em desenvolvimento e será lançado em uma futura atualização.
+Todos os membros atuais terão acesso automaticamente quando for liberado.”
+
+Botão:
+“Entendi”
+
+Ao clicar, apenas fecha o card.
+
+🎨 Design
+
+Seguir exatamente o mesmo padrão visual do Web App
+
+Minimalista
+
+Profissional
+
+Sem exageros visuais
+
+Responsivo
+
+⚙️ Importante
+
+Garantir que:
+
+O projeto compile sem erros
+
+Não existam variáveis órfãs
+
+Não existam imports não utilizados
+
+Não existam erros no build da Vercel
+
+O botão do Mentor continue visível no painel

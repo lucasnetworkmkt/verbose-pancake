@@ -24,6 +24,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
   const streamerRef = useRef<AudioStreamer | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSessionOpenRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,7 +88,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
       // 1. Solicita permissão do microfone ANTES de conectar
       try {
         await recorderRef.current.start((base64Data) => {
-          if (sessionRef.current) {
+          if (isSessionOpenRef.current && sessionRef.current) {
             sessionRef.current.then((session: any) => {
               try {
                 session.sendRealtimeInput({
@@ -106,9 +107,10 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
       // 2. Conecta na API Live
       const sessionPromise = aiRef.current.live.connect({
-        model: "gemini-2.5-flash-native-audio-preview-12-2025",
+        model: "gemini-2.5-flash-native-audio-preview-09-2025",
         callbacks: {
           onopen: () => {
+            isSessionOpenRef.current = true;
             setIsConnected(true);
             setIsConnecting(false);
             incrementSessions();
@@ -149,6 +151,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
           },
           onclose: (event: any) => {
             console.log("Live API Closed:", event);
+            isSessionOpenRef.current = false;
             setIsConnected((prev) => {
               if (prev) {
                 setError("A conexão foi encerrada pelo servidor.");

@@ -25,6 +25,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
   const recorderRef = useRef<AudioRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isSessionOpenRef = useRef(false);
+  const hasIncrementedRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -73,6 +74,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
     try {
       setIsConnecting(true);
       setError(null);
+      hasIncrementedRef.current = false;
 
       const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
       if (!apiKey) {
@@ -93,7 +95,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
             isSessionOpenRef.current = true;
             setIsConnected(true);
             setIsConnecting(false);
-            incrementSessions();
+            
+            if (!hasIncrementedRef.current) {
+              incrementSessions();
+              hasIncrementedRef.current = true;
+            }
+            
             setTimeLeft(MAX_TIME_SECONDS);
             
             timerRef.current = setInterval(() => {

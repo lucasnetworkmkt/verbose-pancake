@@ -85,31 +85,11 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
 
       streamerRef.current.init();
 
-      // 1. Solicita permissão do microfone ANTES de conectar
-      try {
-        await recorderRef.current.start((base64Data) => {
-          if (isSessionOpenRef.current && sessionRef.current) {
-            sessionRef.current.then((session: any) => {
-              try {
-                session.sendRealtimeInput({
-                  media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-                });
-              } catch (e) {
-                console.error("Erro ao enviar áudio:", e);
-              }
-            }).catch(console.error);
-          }
-        });
-      } catch (err: any) {
-        console.error("Erro ao acessar microfone:", err);
-        throw new Error("Erro ao acessar o microfone. Verifique as permissões do navegador.");
-      }
-
-      // 2. Conecta na API Live
+      // 1. Conecta na API Live
       const sessionPromise = aiRef.current.live.connect({
         model: "gemini-2.5-flash-native-audio-preview-09-2025",
         callbacks: {
-          onopen: () => {
+          onopen: async () => {
             isSessionOpenRef.current = true;
             setIsConnected(true);
             setIsConnecting(false);
@@ -125,6 +105,27 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
                 return prev - 1;
               });
             }, 1000);
+
+            // 2. Solicita permissão do microfone e começa a gravar APÓS conectar
+            try {
+              await recorderRef.current?.start((base64Data) => {
+                if (isSessionOpenRef.current && sessionRef.current) {
+                  sessionRef.current.then((session: any) => {
+                    try {
+                      session.sendRealtimeInput({
+                        media: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+                      });
+                    } catch (e) {
+                      console.error("Erro ao enviar áudio:", e);
+                    }
+                  }).catch(console.error);
+                }
+              });
+            } catch (err: any) {
+              console.error("Erro ao acessar microfone:", err);
+              setError("Erro ao acessar o microfone. Verifique as permissões do navegador.");
+              stopSession();
+            }
           },
           onmessage: async (message: LiveServerMessage) => {
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;

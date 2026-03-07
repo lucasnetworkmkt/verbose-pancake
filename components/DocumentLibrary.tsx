@@ -80,7 +80,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-140px)] gap-6">
       {/* SIDEBAR: LIST & ADD */}
-      <div className="w-full md:w-1/3 flex flex-col gap-4">
+      <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedDocId ? 'hidden md:flex' : 'flex'}`}>
         
         {/* Add Form */}
         <div className="bg-app-input p-4 rounded border border-app-border">
@@ -160,6 +160,17 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
                     <Star size={16} className={doc.isFavorite ? "fill-app-gold" : ""} />
                  </button>
 
+                 <a 
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-app-subtext hover:text-app-gold transition-colors"
+                    title="Abrir Link"
+                 >
+                    <ExternalLink size={16} />
+                 </a>
+
                  <button 
                     onClick={(e) => handleDelete(e, doc.id)}
                     className="text-app-subtext hover:text-app-red opacity-0 group-hover:opacity-100 transition-opacity"
@@ -173,7 +184,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
       </div>
 
       {/* MAIN: VIEWER & NOTES */}
-      <div className="w-full md:w-2/3 flex flex-col gap-4 bg-app-card border border-app-border rounded-lg overflow-hidden relative">
+      <div className={`w-full md:w-2/3 flex-col gap-4 bg-app-card border border-app-border rounded-lg overflow-hidden relative ${!selectedDocId ? 'hidden md:flex' : 'flex'}`}>
         {!selectedDoc ? (
            <div className="flex-1 flex flex-col items-center justify-center text-app-subtext">
              <Link size={48} className="mb-4 opacity-20" />
@@ -184,6 +195,12 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
               {/* Header */}
               <div className="p-4 bg-app-input border-b border-app-border flex justify-between items-center shrink-0">
                  <div className="flex items-center gap-3 overflow-hidden">
+                    <button 
+                        onClick={() => setSelectedDocId(null)} 
+                        className="md:hidden p-2 -ml-2 text-app-subtext hover:text-app-text transition-colors"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
                     <button 
                         onClick={(e) => toggleFavorite(e, selectedDoc)}
                         className={`p-2 bg-app-card border border-app-border rounded flex-shrink-0 transition-colors ${selectedDoc.isFavorite ? 'border-app-gold' : ''}`}

@@ -568,7 +568,23 @@ function App() {
   const addRoutine = (title: string, priority: Priority, category: Category, goalId?: string) => {
     setAppState(prev => {
         if(!prev) return null;
-        const newRoutine: Routine = { id: crypto.randomUUID(), title, priority, category, frequency: 'DAILY', linkedGoalId: goalId, routineTasks: [] };
+        const newRoutine: Routine = { 
+            id: crypto.randomUUID(), 
+            title, 
+            priority, 
+            category, 
+            frequency: 'DAILY', 
+            linkedGoalId: goalId, 
+            routineTasks: {
+                [DayOfWeek.MONDAY]: [],
+                [DayOfWeek.TUESDAY]: [],
+                [DayOfWeek.WEDNESDAY]: [],
+                [DayOfWeek.THURSDAY]: [],
+                [DayOfWeek.FRIDAY]: [],
+                [DayOfWeek.SATURDAY]: [],
+                [DayOfWeek.SUNDAY]: [],
+            } 
+        };
         return { ...prev, routines: [...prev.routines, newRoutine] };
     });
   };

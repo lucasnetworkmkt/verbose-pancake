@@ -1,4 +1,14 @@
 
+export enum DayOfWeek {
+  MONDAY = 'MONDAY',
+  TUESDAY = 'TUESDAY',
+  WEDNESDAY = 'WEDNESDAY',
+  THURSDAY = 'THURSDAY',
+  FRIDAY = 'FRIDAY',
+  SATURDAY = 'SATURDAY',
+  SUNDAY = 'SUNDAY'
+}
+
 export enum Priority {
   LOW = 'LOW',
   MODERATE = 'MODERATE',
@@ -45,7 +55,7 @@ export interface Routine {
   time?: string;
   frequency: 'DAILY' | 'WEEKLY';
   linkedGoalId?: string;
-  routineTasks?: RoutineTask[];
+  routineTasks?: Record<DayOfWeek, RoutineTask[]>;
 }
 
 export interface Goal {

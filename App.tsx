@@ -40,6 +40,7 @@ import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES,
 import CheckInModal from './components/CheckInModal';
 import RoutineList from './components/RoutineList';
 import HistoryChart from './components/HistoryChart';
+import HistoryDashboard from './components/HistoryDashboard';
 import GoalCreator from './components/GoalCreator';
 import RoutineDetailsModal from './components/RoutineDetailsModal';
 import ExecutionTimer from './components/ExecutionTimer';
@@ -1177,11 +1178,7 @@ function App() {
           {activeTab === 'HISTORY' && (
               <div className="max-w-4xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Histórico de Consistência</h2>
-                  <div className="bg-app-card p-4 md:p-6 rounded border border-app-border mb-6 md:mb-8 shadow-sm"><h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3><HistoryChart logs={appState.dayLogs} totalRoutines={appState.routines.length} /></div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-                      <div className="bg-app-card p-6 md:p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm"><AlertOctagon size={40} className="md:w-12 md:h-12 text-app-red mb-4" /><div className="text-4xl md:text-5xl font-bold text-app-text mb-2">{Object.values(appState.dayLogs).filter((l: DayLog) => l.isValid).length}</div><p className="text-app-subtext uppercase text-xs md:text-sm tracking-widest">Dias Válidos Totais</p></div>
-                      <div className="bg-app-card p-6 md:p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm"><Target size={40} className="md:w-12 md:h-12 text-app-gold mb-4" /><div className="text-4xl md:text-5xl font-bold text-app-text mb-2">{bestStreak}</div><p className="text-app-subtext uppercase text-xs md:text-sm tracking-widest">Melhor Sequência</p></div>
-                  </div>
+                  <HistoryDashboard logs={appState.dayLogs} routines={appState.routines} />
               </div>
           )}
 

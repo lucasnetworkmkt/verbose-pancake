@@ -405,7 +405,7 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
 
 function App() {
   const [appState, setAppState] = useState<AppState | null>(null);
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(true);
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
@@ -421,10 +421,10 @@ function App() {
         if (state) {
           handleLogin(state);
         }
-      } catch (error) {
-        console.error("Failed to restore session:", error);
+      } catch (e) {
+        console.error("Failed to restore session", e);
       } finally {
-        setIsRestoringSession(false);
+        setIsRestoring(false);
       }
     };
     restore();
@@ -460,8 +460,7 @@ function App() {
     setAppState(state);
   };
 
-  const handleLogout = async () => {
-    await authService.logout();
+  const handleLogout = () => {
     setAppState(null);
   };
 
@@ -509,6 +508,35 @@ function App() {
       else break;
     }
     return streak;
+  }, [appState]);
+
+  const calculateBestStreak = useCallback(() => {
+    if (!appState) return 0;
+    const dates = Object.keys(appState.dayLogs).sort();
+    if (dates.length === 0) return 0;
+    
+    let bestStreak = 0;
+    let currentStreak = 0;
+    
+    const firstDate = new Date(dates[0]);
+    const today = new Date();
+    
+    const allDays = eachDayOfInterval({ start: firstDate, end: today });
+    
+    for (const day of allDays) {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const log = appState.dayLogs[dateStr];
+      if (log && log.isValid) {
+        currentStreak += 1;
+        if (currentStreak > bestStreak) {
+          bestStreak = currentStreak;
+        }
+      } else {
+        currentStreak = 0;
+      }
+    }
+    
+    return bestStreak;
   }, [appState]);
 
   const toggleRoutineForToday = (routineId: string) => {
@@ -724,13 +752,10 @@ function App() {
 
   // --- Render ---
 
-  if (isRestoringSession) {
+  if (isRestoring) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-app-bg p-4">
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-app-border border-t-app-gold rounded-full animate-spin mb-4"></div>
-          <p className="text-app-subtext text-sm font-bold uppercase tracking-widest">Carregando Sessão...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-app-bg">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-app-gold"></div>
       </div>
     );
   }
@@ -742,6 +767,7 @@ function App() {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayLog = appState.dayLogs[todayStr];
   const streak = calculateStreak();
+  const bestStreak = calculateBestStreak();
   const currentTimerState = appState.timer || { status: 'IDLE', durationSeconds: 0, startTime: null, deliverable: '' };
   
   const userNotes = appState.notes || [];
@@ -933,7 +959,7 @@ function App() {
                 {/* Mentor Help Button */}
                 <button onClick={() => setShowMentorModal(true)} className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-3 md:p-4 rounded flex items-center justify-center gap-2 md:gap-3 transition-all group shadow-sm hover:shadow-md">
                   <div className="p-1.5 md:p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors"><Mic size={16} className="md:w-5 md:h-5 text-app-gold group-hover:scale-110 transition-transform" /></div>
-                  <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Mentor Estratégico</span>
+                  <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Precisa de ajuda? Fale por voz com o mentor!</span>
                 </button>
 
                 {/* Today's Routines */}
@@ -1135,10 +1161,10 @@ function App() {
           {activeTab === 'HISTORY' && (
               <div className="max-w-4xl mx-auto">
                   <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Histórico de Consistência</h2>
-                  <div className="bg-app-card p-4 md:p-6 rounded border border-app-border mb-6 md:mb-8 shadow-sm"><h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3><HistoryChart logs={appState.dayLogs} /></div>
+                  <div className="bg-app-card p-4 md:p-6 rounded border border-app-border mb-6 md:mb-8 shadow-sm"><h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Últimos 14 dias</h3><HistoryChart logs={appState.dayLogs} totalRoutines={appState.routines.length} /></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                       <div className="bg-app-card p-6 md:p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm"><AlertOctagon size={40} className="md:w-12 md:h-12 text-app-red mb-4" /><div className="text-4xl md:text-5xl font-bold text-app-text mb-2">{Object.values(appState.dayLogs).filter((l: DayLog) => l.isValid).length}</div><p className="text-app-subtext uppercase text-xs md:text-sm tracking-widest">Dias Válidos Totais</p></div>
-                      <div className="bg-app-card p-6 md:p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm"><Target size={40} className="md:w-12 md:h-12 text-app-gold mb-4" /><div className="text-4xl md:text-5xl font-bold text-app-text mb-2">{streak}</div><p className="text-app-subtext uppercase text-xs md:text-sm tracking-widest">Melhor Sequência</p></div>
+                      <div className="bg-app-card p-6 md:p-8 rounded border border-app-border flex flex-col items-center justify-center text-center shadow-sm"><Target size={40} className="md:w-12 md:h-12 text-app-gold mb-4" /><div className="text-4xl md:text-5xl font-bold text-app-text mb-2">{bestStreak}</div><p className="text-app-subtext uppercase text-xs md:text-sm tracking-widest">Melhor Sequência</p></div>
                   </div>
               </div>
           )}

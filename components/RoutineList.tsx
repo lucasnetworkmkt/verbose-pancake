@@ -1,5 +1,6 @@
 import React from 'react';
-import { Routine, Priority, DayLog } from '../types';
+import { parseISO, getDay } from 'date-fns';
+import { Routine, Priority, DayLog, DayOfWeek } from '../types';
 import { getPriorityBorderClass, getPriorityColor } from '../constants';
 import { Check, Clock, Settings, List, Trash2 } from 'lucide-react';
 
@@ -15,6 +16,18 @@ interface RoutineListProps {
 const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggle, onOpenDetails, dateStr, onDelete }) => {
   const completedIds = currentLog?.completedRoutineIds || [];
   
+  const dayIndex = getDay(parseISO(dateStr)); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const dayMap: Record<number, DayOfWeek> = {
+      1: DayOfWeek.MONDAY,
+      2: DayOfWeek.TUESDAY,
+      3: DayOfWeek.WEDNESDAY,
+      4: DayOfWeek.THURSDAY,
+      5: DayOfWeek.FRIDAY,
+      6: DayOfWeek.SATURDAY,
+      0: DayOfWeek.SUNDAY,
+  };
+  const currentDay = dayMap[dayIndex];
+
   // Sort: High Priority First, then completed last
   const sortedRoutines = [...routines].sort((a, b) => {
     const isACompleted = completedIds.includes(a.id);
@@ -39,7 +52,8 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggl
         const isCompleted = completedIds.includes(routine.id);
         const borderColor = getPriorityBorderClass(routine.priority);
         const iconColor = getPriorityColor(routine.priority);
-        const taskCount = routine.routineTasks?.length || 0;
+        const tasksForDay = routine.routineTasks?.[currentDay] || [];
+        const taskCount = tasksForDay.length;
 
         return (
           <div 

@@ -27,13 +27,17 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose }) => {
             
             <h2 className="text-xl font-bold text-app-text mb-4 uppercase tracking-wider">🚀 Mentor Estratégico</h2>
             
-            <p className="text-app-subtext text-sm mb-8 leading-relaxed">
-                O Mentor por IA está em desenvolvimento e será lançado em uma futura atualização. Todos os membros atuais terão acesso automaticamente quando for liberado.
-            </p>
+            <div className="text-center bg-app-input p-6 rounded border border-app-border mb-8 w-full">
+                <p className="text-app-subtext text-sm leading-relaxed">
+                    O Mentor por IA está em desenvolvimento e será lançado em uma futura atualização.
+                    <br /><br />
+                    Todos os membros atuais terão acesso automaticamente quando for liberado.
+                </p>
+            </div>
 
             <button 
                 onClick={onClose}
-                className="w-full bg-app-input hover:bg-app-hover border border-app-border text-app-text font-bold py-4 rounded uppercase tracking-widest transition-all shadow-sm"
+                className="w-full bg-app-gold hover:bg-yellow-500 text-black font-bold py-4 rounded uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:scale-[1.02] shadow-lg shadow-app-gold/20"
             >
                 Entendi
             </button>

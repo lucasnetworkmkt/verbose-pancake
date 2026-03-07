@@ -70,6 +70,61 @@ export const fileService = {
 // --- AUTH & DATA SERVICES ---
 
 export const authService = {
+  restoreSession: async (): Promise<AppState | null> => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) return null;
+
+    const authData = { user: session.user };
+
+    const { data: dbData, error: dbError } = await supabase
+      .from('app_data')
+      .select('data')
+      .eq('user_id', authData.user.id)
+      .single();
+
+    const { data: filesData, error: filesError } = await supabase
+      .from('user_files')
+      .select('*')
+      .eq('user_id', authData.user.id);
+
+    if (dbError && dbError.code !== 'PGRST116') { 
+        console.error("Erro ao buscar dados:", dbError);
+    }
+
+    const appStateData = dbData?.data || createInitialState();
+    
+    let loadedFiles: MediaFile[] = [];
+    if (filesData) {
+        loadedFiles = filesData.map((f: any) => ({
+            id: f.id,
+            fileName: f.file_name,
+            fileType: f.file_type,
+            mimeType: f.mime_type,
+            dataUrl: f.data_url,
+            uploadDate: f.created_at,
+            notes: f.notes || '',
+            isFavorite: f.is_favorite || false
+        }));
+    }
+
+    if (!appStateData.files || appStateData.files.length === 0) {
+        appStateData.files = loadedFiles;
+    }
+
+    if (appStateData.settings && !appStateData.settings.theme) appStateData.settings.theme = 'dark';
+    
+    const user: User = {
+        id: authData.user.id,
+        username: authData.user.user_metadata?.username || authData.user.email?.split('@')[0] || 'User',
+        email: authData.user.email || '',
+        password: '', 
+        avatarUrl: appStateData.user?.avatarUrl || '', 
+        createdAt: new Date(authData.user.created_at).getTime()
+    };
+
+    return { ...appStateData, files: loadedFiles, user };
+  },
+
   login: async (email: string, password: string): Promise<AppState | null> => {
     // 1. Autenticação
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -174,75 +229,6 @@ export const authService = {
     }
 
     return { user, ...initialState };
-  },
-
-  restoreSession: async (): Promise<AppState | null> => {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session || !session.user) {
-      return null;
-    }
-
-    const authUser = session.user;
-
-    // 2. Buscar App Data (JSON Geral)
-    const { data: dbData, error: dbError } = await supabase
-      .from('app_data')
-      .select('data')
-      .eq('user_id', authUser.id)
-      .single();
-
-    // 3. Buscar User Files (Tabela Dedicada)
-    const { data: filesData, error: filesError } = await supabase
-      .from('user_files')
-      .select('*')
-      .eq('user_id', authUser.id);
-
-    if (dbError && dbError.code !== 'PGRST116') { 
-        console.error("Erro ao buscar dados:", dbError);
-    }
-
-    // Prepara estado inicial ou carrega do banco
-    const appStateData = dbData?.data || createInitialState();
-    
-    // Mapeia os arquivos da tabela nova para o formato do AppState
-    let loadedFiles: MediaFile[] = [];
-    if (filesData) {
-        loadedFiles = filesData.map((f: any) => ({
-            id: f.id,
-            fileName: f.file_name,
-            fileType: f.file_type,
-            mimeType: f.mime_type,
-            dataUrl: f.data_url,
-            uploadDate: f.created_at,
-            notes: f.notes || '',
-            isFavorite: f.is_favorite || false
-        }));
-    }
-
-    if (appStateData.files && appStateData.files.length > 0) {
-        // Fallback
-    } else {
-        appStateData.files = loadedFiles;
-    }
-
-    // Migrações de segurança
-    if (appStateData.settings && !appStateData.settings.theme) appStateData.settings.theme = 'dark';
-    
-    const user: User = {
-        id: authUser.id,
-        username: authUser.user_metadata?.username || authUser.email?.split('@')[0] || 'User',
-        email: authUser.email || '',
-        password: '', // We don't have the password on restore, but it's not needed for normal operation
-        avatarUrl: appStateData.user?.avatarUrl || '', 
-        createdAt: new Date(authUser.created_at).getTime()
-    };
-
-    return { ...appStateData, files: loadedFiles, user };
-  },
-
-  logout: async () => {
-    await supabase.auth.signOut();
   }
 };
 

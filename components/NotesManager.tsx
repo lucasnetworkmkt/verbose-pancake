@@ -43,6 +43,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   const [editContent, setEditContent] = useState('');
   const [editCategory, setEditCategory] = useState<Category>(Category.MIND);
   const [editGoalId, setEditGoalId] = useState<string>('');
+  const [editDocumentId, setEditDocumentId] = useState<string>('');
   const [editIsFavorite, setEditIsFavorite] = useState(false);
   
   // Initialize editor when selection changes
@@ -52,6 +53,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
       setEditContent('');
       setEditCategory(Category.MIND);
       setEditGoalId('');
+      setEditDocumentId('');
       setEditIsFavorite(false);
     } else if (selectedNoteId) {
       const note = notes.find(n => n.id === selectedNoteId);
@@ -60,24 +62,33 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         setEditContent(note.content);
         setEditCategory(note.category);
         setEditGoalId(note.goalId || '');
+        setEditDocumentId(note.documentId || '');
         setEditIsFavorite(note.isFavorite || false);
       }
     }
   }, [selectedNoteId, notes]);
 
-  const handleSave = () => {
-    if (!editTitle.trim()) return;
+  const handleSave = (overrides?: Partial<Note>) => {
+    const title = overrides?.title !== undefined ? overrides.title : editTitle;
+    if (!title.trim()) return;
+
+    const category = overrides?.category !== undefined ? overrides.category : editCategory;
+    const content = overrides?.content !== undefined ? overrides.content : editContent;
+    const goalId = overrides?.goalId !== undefined ? overrides.goalId : (editGoalId || undefined);
+    const documentId = overrides?.documentId !== undefined ? overrides.documentId : (editDocumentId || undefined);
+    const isFavorite = overrides?.isFavorite !== undefined ? overrides.isFavorite : editIsFavorite;
 
     if (selectedNoteId === 'NEW') {
       const newNote: Note = {
         id: crypto.randomUUID(),
-        title: editTitle,
-        content: editContent,
-        category: editCategory,
-        goalId: editGoalId || undefined,
+        title,
+        content,
+        category,
+        goalId,
+        documentId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        isFavorite: editIsFavorite
+        isFavorite
       };
       onAddNote(newNote);
       setSelectedNoteId(newNote.id);
@@ -86,12 +97,13 @@ const NotesManager: React.FC<NotesManagerProps> = ({
       if (existingNote) {
         onUpdateNote({
           ...existingNote,
-          title: editTitle,
-          content: editContent,
-          category: editCategory,
-          goalId: editGoalId || undefined,
+          title,
+          content,
+          category,
+          goalId,
+          documentId,
           updatedAt: new Date().toISOString(),
-          isFavorite: editIsFavorite
+          isFavorite
         });
       }
     }
@@ -283,9 +295,9 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     <div className="flex-1 min-w-[150px] flex items-center gap-2">
                         <button 
                             onClick={() => {
-                                setEditIsFavorite(!editIsFavorite);
-                                // Trigger save logic happens on blur/effect, but we can force update state here
-                                // Since logic is tied to state, it will save on next blur or manual save
+                                const val = !editIsFavorite;
+                                setEditIsFavorite(val);
+                                if (selectedNoteId !== 'NEW') handleSave({ isFavorite: val });
                             }}
                             className={`p-1 transition-colors ${editIsFavorite ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold'}`}
                         >
@@ -304,7 +316,11 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                     <div className="flex gap-2 w-full md:w-auto">
                         <select 
                             value={editCategory}
-                            onChange={e => { setEditCategory(e.target.value as Category); handleBlur(); }}
+                            onChange={e => { 
+                                const val = e.target.value as Category;
+                                setEditCategory(val); 
+                                if (selectedNoteId !== 'NEW') handleSave({ category: val }); 
+                            }}
                             className="flex-1 md:flex-none bg-app-card border border-app-border text-xs text-app-subtext rounded px-2 py-2 outline-none focus:border-app-gold"
                         >
                             {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
@@ -312,17 +328,34 @@ const NotesManager: React.FC<NotesManagerProps> = ({
 
                         <select 
                             value={editGoalId}
-                            onChange={e => { setEditGoalId(e.target.value); handleBlur(); }}
+                            onChange={e => { 
+                                const val = e.target.value;
+                                setEditGoalId(val); 
+                                if (selectedNoteId !== 'NEW') handleSave({ goalId: val || undefined }); 
+                            }}
                             className="flex-1 md:flex-none bg-app-card border border-app-border text-xs text-app-subtext rounded px-2 py-2 outline-none focus:border-app-gold max-w-[150px]"
                         >
                             <option value="">-- Sem Meta --</option>
                             {goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
                         </select>
+
+                        <select 
+                            value={editDocumentId}
+                            onChange={e => { 
+                                const val = e.target.value;
+                                setEditDocumentId(val); 
+                                if (selectedNoteId !== 'NEW') handleSave({ documentId: val || undefined }); 
+                            }}
+                            className="flex-1 md:flex-none bg-app-card border border-app-border text-xs text-app-subtext rounded px-2 py-2 outline-none focus:border-app-gold max-w-[150px]"
+                        >
+                            <option value="">-- Sem Link --</option>
+                            {documents.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                        </select>
                     </div>
                     
                     {selectedNoteId === 'NEW' && (
                         <button 
-                            onClick={handleSave}
+                            onClick={() => handleSave()}
                             disabled={!editTitle.trim()}
                             className="w-full md:w-auto bg-app-gold text-black px-4 py-2 rounded text-xs font-bold uppercase hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >

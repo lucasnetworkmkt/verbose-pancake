@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Clock, Check, Sun, Sunset, Moon } from 'lucide-react';
-import { Routine, RoutineTask, TimeBlock } from '../types';
+import { Routine, RoutineTask, TimeBlock, DayOfWeek } from '../types';
 
 interface RoutineDetailsModalProps {
   isOpen: boolean;
@@ -13,10 +13,11 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('08:00');
   const [activeBlock, setActiveBlock] = useState<TimeBlock>(TimeBlock.MORNING);
+  const [activeDay, setActiveDay] = useState<DayOfWeek>(DayOfWeek.MONDAY);
 
   if (!isOpen || !routine) return null;
 
-  const tasks = routine.routineTasks || [];
+  const tasks = routine.routineTasks?.[activeDay] || [];
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
       const val = e.target.value;
@@ -37,7 +38,10 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
 
     const updatedRoutine = {
       ...routine,
-      routineTasks: [...tasks, newTask]
+      routineTasks: {
+        ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+        [activeDay]: [...tasks, newTask]
+      }
     };
 
     onUpdateRoutine(updatedRoutine);
@@ -48,13 +52,25 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     const updatedTasks = tasks.map(t => 
       t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t
     );
-    onUpdateRoutine({ ...routine, routineTasks: updatedTasks });
+    onUpdateRoutine({ 
+        ...routine, 
+        routineTasks: {
+            ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+            [activeDay]: updatedTasks
+        }
+    });
   };
 
   const deleteTask = (taskId: string) => {
     if (window.confirm("Excluir esta tarefa da rotina?")) {
         const updatedTasks = tasks.filter(t => t.id !== taskId);
-        onUpdateRoutine({ ...routine, routineTasks: updatedTasks });
+        onUpdateRoutine({ 
+            ...routine, 
+            routineTasks: {
+                ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+                [activeDay]: updatedTasks
+            }
+        });
     }
   };
 
@@ -62,7 +78,13 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     const updatedTasks = tasks.map(t => 
       t.id === taskId ? { ...t, time: newTime } : t
     );
-    onUpdateRoutine({ ...routine, routineTasks: updatedTasks });
+    onUpdateRoutine({ 
+        ...routine, 
+        routineTasks: {
+            ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+            [activeDay]: updatedTasks
+        }
+    });
   };
 
   const getBlockIcon = (block: TimeBlock) => {
@@ -73,11 +95,21 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     }
   };
 
+  const dayLabels: Record<DayOfWeek, string> = {
+      [DayOfWeek.MONDAY]: 'Seg',
+      [DayOfWeek.TUESDAY]: 'Ter',
+      [DayOfWeek.WEDNESDAY]: 'Qua',
+      [DayOfWeek.THURSDAY]: 'Qui',
+      [DayOfWeek.FRIDAY]: 'Sex',
+      [DayOfWeek.SATURDAY]: 'Sáb',
+      [DayOfWeek.SUNDAY]: 'Dom',
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 md:p-4">
-      <div className="w-full max-w-4xl bg-app-card border border-app-border rounded-lg shadow-2xl flex flex-col max-h-[95vh] md:max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4">
+      <div className="w-full h-full md:h-[95vh] md:max-w-6xl bg-app-card border border-app-border rounded-none md:rounded-xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-start p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 rounded-t-lg">
+        <div className="flex justify-between items-start p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 rounded-t-none md:rounded-t-xl">
           <div className="min-w-0 pr-2">
             <h2 className="text-base md:text-2xl font-bold text-app-text uppercase tracking-wider break-words leading-tight">{routine.title}</h2>
             <p className="text-app-subtext text-[10px] md:text-sm truncate">Microtarefas e Execução Detalhada</p>
@@ -85,6 +117,19 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
           <button onClick={onClose} className="text-app-subtext hover:text-app-text transition-colors p-1 shrink-0">
             <X size={20} className="md:w-6 md:h-6" />
           </button>
+        </div>
+
+        {/* Day Selector */}
+        <div className="flex border-b border-app-border p-2 gap-1 overflow-x-auto">
+            {Object.values(DayOfWeek).map(day => (
+                <button
+                    key={day}
+                    onClick={() => setActiveDay(day)}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors ${activeDay === day ? 'bg-app-gold text-black font-bold' : 'bg-app-input text-app-subtext hover:text-app-text'}`}
+                >
+                    {dayLabels[day]}
+                </button>
+            ))}
         </div>
 
         {/* Content */}

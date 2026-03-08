@@ -44,7 +44,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
     }
 
     const newDoc: DocumentItem = {
-      id: crypto.randomUUID(),
+      id: Math.random().toString(36).substring(2, 9),
       title: newTitle,
       url: newUrl,
       createdAt: new Date().toISOString(),

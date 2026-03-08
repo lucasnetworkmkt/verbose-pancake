@@ -48,6 +48,7 @@ import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
+import BugReportModal from './components/BugReportModal';
 
 // --- Subcomponents within App.tsx ---
 
@@ -194,6 +195,7 @@ const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, o
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [showBugModal, setShowBugModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,9 +307,16 @@ const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, o
                                 {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
                              </button>
                         </div>
+                        <button 
+                            onClick={() => setShowBugModal(true)}
+                            className="w-full bg-app-card border border-app-border hover:border-app-red text-app-subtext hover:text-app-red text-[10px] uppercase font-bold py-2 rounded transition-colors"
+                        >
+                            Encontrou algum bug?
+                        </button>
                     </div>
                 </div>
             </div>
+            {showBugModal && <BugReportModal onClose={() => setShowBugModal(false)} />}
         </div>
     );
 };
@@ -316,6 +325,7 @@ const MobileUserProfileHeader = ({ user, onUpdateAvatar, theme, onToggleTheme, o
 const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvatar: (url: string) => void }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [showBugModal, setShowBugModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,8 +406,15 @@ const UserProfileSidebar = ({ user, onUpdateAvatar }: { user: User, onUpdateAvat
                             <button onClick={(e) => { e.stopPropagation(); setShowPassword(!showPassword); }} className="text-app-subtext hover:text-app-gold transition-colors p-1">{showPassword ? <EyeOff size={14} /> : <Eye size={14} />}</button>
                         </div>
                     </div>
+                    <button 
+                        onClick={() => setShowBugModal(true)}
+                        className="w-full bg-app-bg border border-app-border hover:border-app-red text-app-subtext hover:text-app-red text-xs uppercase font-bold py-2 rounded transition-colors"
+                    >
+                        Encontrou algum bug?
+                    </button>
                 </div>
             )}
+            {showBugModal && <BugReportModal onClose={() => setShowBugModal(false)} />}
         </div>
     );
 };

@@ -28,8 +28,8 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    const newTask: RoutineTask = {
-      id: crypto.randomUUID(),
+        const newTask: RoutineTask = {
+      id: Math.random().toString(36).substring(2, 9),
       title: newTaskTitle,
       time: newTaskTime,
       isCompleted: false,

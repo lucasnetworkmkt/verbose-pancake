@@ -15,6 +15,11 @@ const BugReportModal: React.FC<BugReportModalProps> = ({ onClose }) => {
     onClose();
   };
 
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText('codigodaevolucao.suporte@gmail.com');
+    alert('E-mail copiado para a área de transferência!');
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-app-card border border-app-border rounded-lg w-full max-w-md p-6 shadow-xl animate-in fade-in zoom-in duration-200">
@@ -34,6 +39,14 @@ const BugReportModal: React.FC<BugReportModalProps> = ({ onClose }) => {
           className="w-full h-32 bg-app-input border border-app-border rounded p-3 text-sm text-app-text focus:border-app-gold outline-none mb-4"
           placeholder="Descreva o bug aqui..."
         />
+        <div className="flex justify-between items-center mb-4">
+          <button 
+            onClick={handleCopyEmail}
+            className="text-xs text-app-gold hover:underline"
+          >
+            Copiar e-mail de suporte
+          </button>
+        </div>
         <div className="flex justify-end gap-2">
           <button 
             onClick={onClose}

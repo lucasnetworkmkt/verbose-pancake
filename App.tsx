@@ -48,7 +48,7 @@ import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
-import BugReportModal from './components/BugReportModal';
+import BugReportModal from './components/BugReportModal.tsx';
 
 // --- Subcomponents within App.tsx ---
 

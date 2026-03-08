@@ -586,7 +586,7 @@ function App() {
                 [DayOfWeek.SUNDAY]: [],
             } 
         };
-        return { ...prev, routines: [...prev.routines, newRoutine] };
+        return { ...prev, routines: [...(prev.routines || []), newRoutine] };
     });
   };
 

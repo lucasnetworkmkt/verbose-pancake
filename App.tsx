@@ -570,7 +570,7 @@ function App() {
     setAppState(prev => {
         if(!prev) return null;
         const newRoutine: Routine = { 
-            id: crypto.randomUUID(), 
+            id: Math.random().toString(36).substring(2, 9), 
             title, 
             priority, 
             category, 
@@ -613,7 +613,7 @@ function App() {
   const handleCreateGoal = (data: { title: string; description: string; deadline: string; category: Category; priority: Priority }) => {
       setAppState(prev => {
           if(!prev) return null;
-          const newGoal: Goal = { id: crypto.randomUUID(), title: data.title, description: data.description, deadline: data.deadline, status: 'ACTIVE', category: data.category, priority: data.priority, tasks: [] };
+          const newGoal: Goal = { id: Math.random().toString(36).substring(2, 9), title: data.title, description: data.description, deadline: data.deadline, status: 'ACTIVE', category: data.category, priority: data.priority, tasks: [] };
           return {...prev, goals: [...prev.goals, newGoal]};
       });
   };
@@ -633,7 +633,7 @@ function App() {
   const addTaskToGoal = (goalId: string, taskTitle: string, time: string = "00:00") => {
       setAppState(prev => {
           if(!prev) return null;
-          const newTask: MicroTask = { id: crypto.randomUUID(), title: taskTitle, isCompleted: false, time };
+          const newTask: MicroTask = { id: Math.random().toString(36).substring(2, 9), title: taskTitle, isCompleted: false, time };
           const updatedGoals = prev.goals.map(g => {
               if(g.id === goalId) return { ...g, tasks: [...g.tasks, newTask] };
               return g;

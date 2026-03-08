@@ -68,7 +68,7 @@ const MediaLibrary: React.FC<MediaLibraryProps> = ({ files, onAddFile, onUpdateF
       const type = getFileType(file.type);
       
       const newFile: MediaFile = {
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).substring(2, 9),
         fileName: file.name,
         fileType: type,
         mimeType: file.type,

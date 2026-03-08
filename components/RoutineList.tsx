@@ -13,7 +13,7 @@ interface RoutineListProps {
   onDelete?: (routineId: string) => void;
 }
 
-const RoutineList: React.FC<RoutineListProps> = ({ routines, currentLog, onToggle, onOpenDetails, dateStr, onDelete }) => {
+const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, onToggle, onOpenDetails, dateStr, onDelete }) => {
   const completedIds = currentLog?.completedRoutineIds || [];
   
   const dayIndex = getDay(parseISO(dateStr)); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday

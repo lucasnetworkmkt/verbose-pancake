@@ -34,7 +34,7 @@ import {
   DollarSign,
   Grid
 } from 'lucide-react';
-import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile } from './types';
+import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile, DayOfWeek } from './types';
 import { authService, dataService, fileService } from './services/storage';
 import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
 import CheckInModal from './components/CheckInModal';

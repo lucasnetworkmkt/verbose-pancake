@@ -80,27 +80,39 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ logs, routines }) =
   // 3. Radar Chart (Life Areas)
   const radarData = useMemo(() => {
     const areas = Object.values(Category);
-    const areaStats = areas.map(area => {
-        let totalTasks = 0;
-        let completedTasks = 0;
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const last7Days = eachDayOfInterval({
+        start: subDays(today, 7),
+        end: subDays(today, 1)
+    });
 
-        Object.values(logs).forEach(log => {
-            routines.forEach(routine => {
-                if (routine.category === area) {
-                    if (log.completedRoutineIds.includes(routine.id)) {
-                        completedTasks += 1;
-                    }
-                    totalTasks += 1;
-                }
-            });
+    return areas.map(area => {
+        const areaRoutines = routines.filter(r => r.category === area);
+        const totalRoutinesInArea = areaRoutines.length;
+        if (totalRoutinesInArea === 0) return { area, today: 0, lastWeek: 0, diff: 0 };
+
+        // Today's progress
+        const todayLog = logs[todayStr];
+        const completedToday = todayLog ? areaRoutines.filter(r => todayLog.completedRoutineIds.includes(r.id)).length : 0;
+        const todayPercentage = Math.round((completedToday / totalRoutinesInArea) * 100);
+
+        // Last week's average
+        const lastWeekPercentages = last7Days.map(day => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const log = logs[dateStr];
+            const completed = log ? areaRoutines.filter(r => log.completedRoutineIds.includes(r.id)).length : 0;
+            return (completed / totalRoutinesInArea) * 100;
         });
+        const lastWeekAverage = Math.round(lastWeekPercentages.reduce((a, b) => a + b, 0) / 7);
 
         return {
             area,
-            percentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+            today: todayPercentage,
+            lastWeek: lastWeekAverage,
+            diff: todayPercentage - lastWeekAverage
         };
     });
-    return areaStats;
   }, [logs, routines]);
 
   return (
@@ -139,14 +151,35 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ logs, routines }) =
             {/* 4. Radar Chart */}
             <div className="bg-app-card p-4 rounded border border-app-border shadow-sm">
                 <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Progresso por Área</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                        <PolarGrid stroke="#374151" />
-                        <PolarAngleAxis dataKey="area" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                        <Radar name="Progresso" dataKey="percentage" stroke="#FFD700" fill="#FFD700" fillOpacity={0.5} />
-                    </RadarChart>
-                </ResponsiveContainer>
+                <div className="flex flex-col md:flex-row items-center">
+                    <ResponsiveContainer width="100%" height={200}>
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                            <PolarGrid stroke="#374151" />
+                            <PolarAngleAxis dataKey="area" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                            <Radar name="Hoje" dataKey="today" stroke="#FFD700" fill="#FFD700" fillOpacity={0.5} />
+                            <Radar name="Semana Passada" dataKey="lastWeek" stroke="#9CA3AF" fill="#9CA3AF" fillOpacity={0.3} />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                    <div className="text-[10px] md:text-xs text-app-subtext w-full md:w-1/2 space-y-1">
+                        <div className="grid grid-cols-4 font-bold text-app-text border-b border-app-border pb-1">
+                            <span className="col-span-1">Área</span>
+                            <span className="text-center">Hoje</span>
+                            <span className="text-center">Sem.</span>
+                            <span className="text-center">Dif.</span>
+                        </div>
+                        {radarData.map(d => (
+                            <div key={d.area} className="grid grid-cols-4">
+                                <span className="col-span-1 truncate">{d.area}</span>
+                                <span className="text-center">{d.today}%</span>
+                                <span className="text-center">{d.lastWeek}%</span>
+                                <span className={`text-center font-bold ${d.diff >= 0 ? 'text-green-500' : 'text-app-red'}`}>
+                                    {d.diff > 0 ? '+' : ''}{d.diff}%
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
 

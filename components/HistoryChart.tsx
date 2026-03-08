@@ -47,10 +47,10 @@ const HistoryChart: React.FC<HistoryChartProps> = ({ logs, totalRoutines }) => {
           <XAxis 
             dataKey="name" 
             stroke="#9CA3AF" 
-            tick={{ fill: '#9CA3AF', fontSize: 12 }} 
+            tick={{ fill: '#9CA3AF', fontSize: 10 }} 
             tickLine={false}
             axisLine={false}
-            interval={0}
+            interval={1}
           />
           <Tooltip 
             cursor={{fill: '#151F28', opacity: 0.5}}

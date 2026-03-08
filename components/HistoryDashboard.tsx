@@ -151,9 +151,9 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ logs, routines }) =
             {/* 4. Radar Chart */}
             <div className="bg-app-card p-4 rounded border border-app-border shadow-sm">
                 <h3 className="text-xs md:text-sm uppercase text-app-subtext mb-4">Progresso por Área</h3>
-                <div className="flex flex-col md:flex-row items-center">
-                    <ResponsiveContainer width="100%" height={200}>
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                <div className="flex flex-col items-center">
+                    <ResponsiveContainer width="100%" height={250}>
+                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                             <PolarGrid stroke="#374151" />
                             <PolarAngleAxis dataKey="area" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
                             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
@@ -161,15 +161,15 @@ const HistoryDashboard: React.FC<HistoryDashboardProps> = ({ logs, routines }) =
                             <Radar name="Semana Passada" dataKey="lastWeek" stroke="#9CA3AF" fill="#9CA3AF" fillOpacity={0.3} />
                         </RadarChart>
                     </ResponsiveContainer>
-                    <div className="text-[10px] md:text-xs text-app-subtext w-full md:w-1/2 space-y-1">
-                        <div className="grid grid-cols-4 font-bold text-app-text border-b border-app-border pb-1">
+                    <div className="text-xs text-app-subtext w-full mt-4 space-y-2">
+                        <div className="grid grid-cols-4 font-bold text-app-text border-b border-app-border pb-2">
                             <span className="col-span-1">Área</span>
                             <span className="text-center">Hoje</span>
                             <span className="text-center">Sem.</span>
                             <span className="text-center">Dif.</span>
                         </div>
                         {radarData.map(d => (
-                            <div key={d.area} className="grid grid-cols-4">
+                            <div key={d.area} className="grid grid-cols-4 py-1 border-b border-app-border/50 last:border-0">
                                 <span className="col-span-1 truncate">{d.area}</span>
                                 <span className="text-center">{d.today}%</span>
                                 <span className="text-center">{d.lastWeek}%</span>

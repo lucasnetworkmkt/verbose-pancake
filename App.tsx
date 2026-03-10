@@ -49,6 +49,7 @@ import EvolutionMap from './components/EvolutionMap';
 import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
 import BugReportModal from './components/BugReportModal.tsx';
+import CopyRoutineModal from './components/CopyRoutineModal';
 
 // --- Subcomponents within App.tsx ---
 
@@ -617,7 +618,7 @@ function App() {
           showToast("Rotina excluída.");
       }
   };
-  
+
   const handleUpdateRoutine = (updatedRoutine: Routine) => {
       setAppState(prev => {
           if(!prev) return null;
@@ -1093,7 +1094,9 @@ function App() {
           {/* ROUTINES MANAGEMENT */}
           {activeTab === 'ROUTINES' && (
              <div className="max-w-2xl mx-auto">
-                 <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Editor de Rotinas</h2>
+                 <div className="flex justify-between items-center mb-4 md:mb-6">
+                     <h2 className="text-lg md:text-2xl font-bold text-app-text">Editor de Rotinas</h2>
+                 </div>
                  <div className="bg-app-card p-4 md:p-6 rounded mb-6 md:mb-8 border border-app-border shadow-sm">
                      <form onSubmit={(e) => {
                          e.preventDefault();

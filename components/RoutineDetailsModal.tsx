@@ -1,21 +1,94 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Clock, Check, Sun, Sunset, Moon } from 'lucide-react';
+import { X, Plus, Trash2, Clock, Check, Sun, Sunset, Moon, Copy, GripVertical } from 'lucide-react';
 import { Routine, RoutineTask, TimeBlock, DayOfWeek } from '../types';
+import CopyRoutineModal from './CopyRoutineModal';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-interface RoutineDetailsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  routine: Routine | null;
-  onUpdateRoutine: (updatedRoutine: Routine) => void;
+interface SortableTaskProps {
+    task: RoutineTask;
+    toggleTask: (id: string) => void;
+    updateTaskTime: (id: string, time: string) => void;
+    updateTaskTitle: (id: string, title: string) => void;
+    deleteTask: (id: string) => void;
 }
+
+const SortableTask: React.FC<SortableTaskProps> = ({ task, toggleTask, updateTaskTime, updateTaskTitle, deleteTask }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id });
+    const style = { transform: CSS.Transform.toString(transform), transition };
+
+    return (
+        <div ref={setNodeRef} style={style} className="group bg-app-card border border-app-border p-2 rounded flex items-start gap-2 hover:border-app-subtext transition-colors">
+            <button {...attributes} {...listeners} className="cursor-grab p-1 text-app-subtext hover:text-app-text"><GripVertical size={16} /></button>
+            <button 
+                onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
+                className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}
+            >
+                {task.isCompleted && <Check size={10} className="md:w-3 md:h-3 text-black font-bold"/>}
+            </button>
+            
+            <div className="flex-1 min-w-0">
+                <input 
+                    value={task.title}
+                    onChange={(e) => updateTaskTitle(task.id, e.target.value)}
+                    className={`bg-transparent w-full text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'} outline-none`}
+                />
+                <div className="flex items-center gap-2 mt-1.5">
+                    <Clock size={10} className="text-app-red shrink-0"/>
+                    <input 
+                        type="time"
+                        value={task.time}
+                        onChange={(e) => updateTaskTime(task.id, e.target.value)}
+                        className="bg-transparent text-[10px] md:text-xs text-app-subtext w-16 outline-none hover:text-app-text focus:text-app-gold p-0 cursor-pointer"
+                    />
+                </div>
+            </div>
+
+            <button 
+                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                className="text-app-subtext hover:text-app-red transition-colors p-0.5 md:p-1 mt-0.5"
+                title="Excluir"
+            >
+                <Trash2 size={14} className="md:w-4 md:h-4" />
+            </button>
+        </div>
+    );
+};
 
 const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClose, routine, onUpdateRoutine }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('08:00');
   const [activeBlock, setActiveBlock] = useState<TimeBlock>(TimeBlock.MORNING);
   const [activeDay, setActiveDay] = useState<DayOfWeek>(DayOfWeek.MONDAY);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   if (!isOpen || !routine) return null;
+
+  const handleCopyRoutines = (sourceDay: DayOfWeek, targetDays: DayOfWeek[]) => {
+    const tasksToCopy = routine.routineTasks?.[sourceDay] || [];
+    
+    const updatedRoutine = {
+      ...routine,
+      routineTasks: {
+        ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+      }
+    };
+
+    targetDays.forEach(day => {
+        updatedRoutine.routineTasks[day] = [
+            ...(updatedRoutine.routineTasks[day] || []),
+            ...tasksToCopy.map(task => ({ ...task, id: Math.random().toString(36).substring(2, 9) }))
+        ];
+    });
+
+    onUpdateRoutine(updatedRoutine);
+  };
 
   const tasks = routine.routineTasks?.[activeDay] || [];
 
@@ -87,6 +160,35 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     });
   };
 
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+        const oldIndex = tasks.findIndex(t => t.id === active.id);
+        const newIndex = tasks.findIndex(t => t.id === over.id);
+        const newTasks = arrayMove(tasks, oldIndex, newIndex);
+        onUpdateRoutine({
+            ...routine,
+            routineTasks: {
+                ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+                [activeDay]: newTasks
+            }
+        });
+    }
+  };
+
+  const updateTaskTitle = (taskId: string, newTitle: string) => {
+    const updatedTasks = tasks.map(t => 
+        t.id === taskId ? { ...t, title: newTitle } : t
+    );
+    onUpdateRoutine({ 
+        ...routine, 
+        routineTasks: {
+            ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+            [activeDay]: updatedTasks
+        }
+    });
+  };
+
   const getBlockIcon = (block: TimeBlock) => {
     switch (block) {
       case TimeBlock.MORNING: return <Sun size={16} className="text-app-gold" />;
@@ -114,10 +216,26 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
             <h2 className="text-base md:text-2xl font-bold text-app-text uppercase tracking-wider break-words leading-tight">{routine.title}</h2>
             <p className="text-app-subtext text-[10px] md:text-sm truncate">Microtarefas e Execução Detalhada</p>
           </div>
-          <button onClick={onClose} className="text-app-subtext hover:text-app-text transition-colors p-1 shrink-0">
-            <X size={20} className="md:w-6 md:h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCopyModal(true)} className="text-app-subtext hover:text-app-gold transition-colors p-1 shrink-0" title="Copiar rotina para outros dias">
+                <Copy size={20} className="md:w-6 md:h-6" />
+            </button>
+            <button onClick={onClose} className="text-app-subtext hover:text-app-text transition-colors p-1 shrink-0">
+                <X size={20} className="md:w-6 md:h-6" />
+            </button>
+          </div>
         </div>
+
+        {showCopyModal && (
+            <CopyRoutineModal 
+                routines={[routine]} 
+                onClose={() => setShowCopyModal(false)} 
+                onCopy={(sourceDay, targetDays) => {
+                    handleCopyRoutines(sourceDay, targetDays);
+                    setShowCopyModal(false);
+                }} 
+            />
+        )}
 
         {/* Day Selector */}
         <div className="flex border-b border-app-border p-2 gap-1 overflow-x-auto">
@@ -161,40 +279,20 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                         Sem tarefas
                       </div>
                     )}
-                    {blockTasks.map(task => (
-                      <div key={task.id} className="group bg-app-card border border-app-border p-2 rounded flex items-start gap-2 hover:border-app-subtext transition-colors">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
-                          className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}
-                        >
-                          {task.isCompleted && <Check size={10} className="md:w-3 md:h-3 text-black font-bold"/>}
-                        </button>
-                        
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>
-                            {task.title}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1.5">
-                             <Clock size={10} className="text-app-red shrink-0"/>
-                             <input 
-                                type="time"
-                                value={task.time}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => updateTaskTime(task.id, e.target.value)}
-                                className="bg-transparent text-[10px] md:text-xs text-app-subtext w-16 outline-none hover:text-app-text focus:text-app-gold p-0 cursor-pointer"
-                             />
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                          className="text-app-subtext hover:text-app-red transition-colors p-0.5 md:p-1 mt-0.5"
-                          title="Excluir"
-                        >
-                          <Trash2 size={14} className="md:w-4 md:h-4" />
-                        </button>
-                      </div>
-                    ))}
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={blockTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                            {blockTasks.map(task => (
+                                <SortableTask 
+                                    key={task.id} 
+                                    task={task} 
+                                    toggleTask={toggleTask} 
+                                    updateTaskTime={updateTaskTime} 
+                                    updateTaskTitle={updateTaskTitle}
+                                    deleteTask={deleteTask}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
                   </div>
 
                   {/* Add Input */}

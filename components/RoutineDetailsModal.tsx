@@ -14,10 +14,52 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
   const [newTaskTime, setNewTaskTime] = useState('08:00');
   const [activeBlock, setActiveBlock] = useState<TimeBlock>(TimeBlock.MORNING);
   const [activeDay, setActiveDay] = useState<DayOfWeek>(DayOfWeek.MONDAY);
+  const [isCopying, setIsCopying] = useState(false);
+  const [targetDays, setTargetDays] = useState<DayOfWeek[]>([]);
 
   if (!isOpen || !routine) return null;
 
   const tasks = routine.routineTasks?.[activeDay] || [];
+
+  const reorderTask = (taskId: string, direction: 'up' | 'down') => {
+    const index = tasks.findIndex(t => t.id === taskId);
+    if (index === -1) return;
+
+    const newTasks = [...tasks];
+    if (direction === 'up' && index > 0) {
+        [newTasks[index], newTasks[index - 1]] = [newTasks[index - 1], newTasks[index]];
+    } else if (direction === 'down' && index < newTasks.length - 1) {
+        [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
+    } else {
+        return;
+    }
+
+    onUpdateRoutine({ 
+        ...routine, 
+        routineTasks: {
+            ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>),
+            [activeDay]: newTasks
+        }
+    });
+  };
+
+  const handleCopyDay = () => {
+    if (targetDays.length === 0) return;
+
+    const sourceTasks = routine.routineTasks?.[activeDay] || [];
+    const updatedRoutineTasks = { ...(routine.routineTasks || {} as Record<DayOfWeek, RoutineTask[]>) };
+
+    targetDays.forEach(day => {
+        updatedRoutineTasks[day] = [...(updatedRoutineTasks[day] || []), ...sourceTasks.map(t => ({ ...t, id: Math.random().toString(36).substring(2, 9) }))];
+    });
+
+    onUpdateRoutine({
+        ...routine,
+        routineTasks: updatedRoutineTasks
+    });
+    setIsCopying(false);
+    setTargetDays([]);
+  };
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
       const val = e.target.value;
@@ -120,16 +162,45 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
         </div>
 
         {/* Day Selector */}
-        <div className="flex border-b border-app-border p-2 gap-1 overflow-x-auto">
-            {Object.values(DayOfWeek).map(day => (
-                <button
-                    key={day}
-                    onClick={() => setActiveDay(day)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${activeDay === day ? 'bg-app-gold text-black font-bold' : 'bg-app-input text-app-subtext hover:text-app-text'}`}
-                >
-                    {dayLabels[day]}
-                </button>
-            ))}
+        <div className="flex flex-col border-b border-app-border p-2 gap-2">
+            <div className="flex gap-1 overflow-x-auto">
+                {Object.values(DayOfWeek).map(day => (
+                    <button
+                        key={day}
+                        onClick={() => setActiveDay(day)}
+                        className={`px-3 py-1 text-xs rounded-full transition-colors ${activeDay === day ? 'bg-app-gold text-black font-bold' : 'bg-app-input text-app-subtext hover:text-app-text'}`}
+                    >
+                        {dayLabels[day]}
+                    </button>
+                ))}
+            </div>
+            <button 
+                onClick={() => setIsCopying(!isCopying)}
+                className="text-xs text-app-gold underline hover:text-app-text self-start"
+            >
+                {isCopying ? 'Cancelar Cópia' : 'Copiar tarefas deste dia para outros'}
+            </button>
+            
+            {isCopying && (
+                <div className="flex flex-wrap gap-2 p-2 bg-app-input rounded border border-app-border">
+                    <span className="text-xs text-app-subtext w-full">Selecione os dias de destino:</span>
+                    {Object.values(DayOfWeek).filter(d => d !== activeDay).map(day => (
+                        <button
+                            key={day}
+                            onClick={() => setTargetDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])}
+                            className={`px-2 py-1 text-xs rounded transition-colors ${targetDays.includes(day) ? 'bg-app-red text-white' : 'bg-app-card text-app-subtext'}`}
+                        >
+                            {dayLabels[day]}
+                        </button>
+                    ))}
+                    <button 
+                        onClick={handleCopyDay}
+                        className="px-3 py-1 text-xs bg-app-gold text-black font-bold rounded hover:bg-yellow-600 transition-colors"
+                    >
+                        Confirmar Cópia
+                    </button>
+                </div>
+            )}
         </div>
 
         {/* Content */}
@@ -163,6 +234,21 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                     )}
                     {blockTasks.map(task => (
                       <div key={task.id} className="group bg-app-card border border-app-border p-2 rounded flex items-start gap-2 hover:border-app-subtext transition-colors">
+                        <div className="flex flex-col gap-1">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'up'); }}
+                            className="text-app-subtext hover:text-app-text"
+                          >
+                            ▲
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'down'); }}
+                            className="text-app-subtext hover:text-app-text"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        
                         <button 
                           onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
                           className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}

@@ -13,6 +13,9 @@ export default defineConfig({
   },
   build: {
     // Aumenta o limite de aviso de tamanho de chunk para evitar warnings desnecessários
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      external: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities']
+    }
   }
 });

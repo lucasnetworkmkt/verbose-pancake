@@ -46,7 +46,6 @@ import RoutineDetailsModal from './components/RoutineDetailsModal';
 import ExecutionTimer from './components/ExecutionTimer';
 import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
-import MentorModal from './components/MentorModal';
 import FinanceManager from './components/FinanceManager';
 import BugReportModal from './components/BugReportModal.tsx';
 
@@ -427,7 +426,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
-  const [showMentorModal, setShowMentorModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
@@ -868,7 +866,6 @@ function App() {
     <div className="flex flex-col md:flex-row h-[100dvh] bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
-      <MentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
 
       {/* MOBILE NAV OVERLAY */}
@@ -989,12 +986,6 @@ function App() {
                     ))}
                   </div>
                 </div>
-
-                {/* Mentor Help Button */}
-                <button onClick={() => setShowMentorModal(true)} className="w-full bg-app-card border border-app-border hover:border-app-gold text-app-subtext hover:text-app-text p-3 md:p-4 rounded flex items-center justify-center gap-2 md:gap-3 transition-all group shadow-sm hover:shadow-md">
-                  <div className="p-1.5 md:p-2 bg-black/50 rounded-full group-hover:bg-app-gold/10 transition-colors"><Mic size={16} className="md:w-5 md:h-5 text-app-gold group-hover:scale-110 transition-transform" /></div>
-                  <span className="font-bold uppercase text-[10px] md:text-xs tracking-wider text-center">Precisa de ajuda? Fale por voz com o mentor!</span>
-                </button>
 
                 {/* Today's Routines */}
                 <div>

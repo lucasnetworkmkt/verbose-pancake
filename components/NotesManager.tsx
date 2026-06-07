@@ -143,7 +143,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className="min-h-full flex flex-col gap-4">
         {/* Main Section Tabs */}
         <div className="flex gap-4 border-b border-app-border pb-2 overflow-x-auto shrink-0">
             <button 

@@ -185,7 +185,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         )}
         
         {activeTab === 'TEXT' && (
-            <div className="flex flex-col md:flex-row md:h-[calc(100vh-190px)] gap-6">
+            <div className="flex flex-col md:flex-row flex-1 md:h-[calc(100vh-190px)] gap-6">
             
             {/* LEFT COLUMN: LIST */}
             <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedNoteId ? 'hidden md:flex' : 'flex'} md:h-full`}>
@@ -227,7 +227,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-[300px]">
                 {filteredNotes.length === 0 && (
                     <div className="text-center py-10 text-app-subtext text-sm">
                     Nenhum registro encontrado.

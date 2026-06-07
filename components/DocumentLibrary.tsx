@@ -78,7 +78,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-140px)] gap-6">
+    <div className="flex flex-col md:flex-row flex-1 md:h-[calc(100vh-140px)] gap-6">
       {/* SIDEBAR: LIST & ADD */}
       <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedDocId ? 'hidden md:flex' : 'flex'}`}>
         
@@ -134,7 +134,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ documents, onAddDocum
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-[300px]">
            {filteredDocs.length === 0 && (
              <div className="text-center py-10 text-app-subtext text-sm">
                Nenhum documento cadastrado.

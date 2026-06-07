@@ -865,7 +865,7 @@ function App() {
   startOfCurrentMonth.setHours(0,0,0,0);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
       <MentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
@@ -929,7 +929,7 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden relative">
         {/* Header - Mobile/Tablet Only (PROFILE & AVATAR) */}
         <div className="lg:hidden">
             {appState.user && (
@@ -944,7 +944,7 @@ function App() {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-2 lg:p-8 space-y-4 md:space-y-8 scroll-smooth pb-20 lg:pb-8">
+        <div className="flex-1 overflow-y-auto p-2 lg:p-8 space-y-4 md:space-y-8 scroll-smooth pb-28 lg:pb-8">
           
           {/* Toast */}
           {toast && (

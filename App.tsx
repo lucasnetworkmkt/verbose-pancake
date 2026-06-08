@@ -42,6 +42,7 @@ import RoutineList from './components/RoutineList';
 import HistoryChart from './components/HistoryChart';
 import HistoryDashboard from './components/HistoryDashboard';
 import GoalCreator from './components/GoalCreator';
+import RoutineCreator from './components/RoutineCreator';
 import RoutineDetailsModal from './components/RoutineDetailsModal';
 import ExecutionTimer from './components/ExecutionTimer';
 import NotesManager from './components/NotesManager';
@@ -426,6 +427,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'METAS' | 'ROUTINES' | 'HISTORY' | 'TIMER' | 'NOTES' | 'EVOLUTION' | 'FINANCE'>('DASHBOARD');
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showGoalCreator, setShowGoalCreator] = useState(false);
+  const [showRoutineCreator, setShowRoutineCreator] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
@@ -866,6 +869,7 @@ function App() {
     <div className="flex flex-col md:flex-row h-[100dvh] bg-app-bg text-app-text font-sans selection:bg-app-red selection:text-white overflow-hidden transition-colors duration-[3000ms]">
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
+      <RoutineCreator isOpen={showRoutineCreator} onClose={() => setShowRoutineCreator(false)} onCreate={addRoutine} goals={appState.goals} />
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
 
       {/* MOBILE NAV OVERLAY */}
@@ -903,7 +907,12 @@ function App() {
       )}
 
       {/* Sidebar - Desktop Only (Visible only on LG and up) */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-colors duration-[3000ms]">
+      <aside className={`hidden lg:flex flex-col border-r border-app-border bg-app-sidebar backdrop-blur z-20 transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-none'}`}>
+        <div className="flex justify-end p-2 opacity-50 hover:opacity-100">
+             <button onClick={() => setIsSidebarOpen(false)} title="Recolher Sidebar">
+                 <X size={16} />
+             </button>
+        </div>
         {appState.user && <UserProfileSidebar user={appState.user} onUpdateAvatar={handleUpdateAvatar} />}
         <nav className="flex-1 px-4 space-y-2 mt-8">
           {NAV_ITEMS.map((item) => {
@@ -927,6 +936,15 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-[100dvh] overflow-hidden relative">
+        {!isSidebarOpen && (
+            <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="hidden lg:flex absolute top-4 left-4 z-50 p-2 bg-app-card border border-app-border rounded-full text-app-text hover:bg-app-hover shadow-lg transition-transform"
+                title="Expandir Sidebar"
+            >
+                <Menu size={20} />
+            </button>
+        )}
         {/* Header - Mobile/Tablet Only (PROFILE & AVATAR) */}
         <div className="lg:hidden">
             {appState.user && (
@@ -1084,38 +1102,13 @@ function App() {
           {/* ROUTINES MANAGEMENT */}
           {activeTab === 'ROUTINES' && (
              <div className="max-w-2xl mx-auto">
-                 <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-app-text">Editor de Rotinas</h2>
-                 <div className="bg-app-card p-4 md:p-6 rounded mb-6 md:mb-8 border border-app-border shadow-sm">
-                     <form onSubmit={(e) => {
-                         e.preventDefault();
-                         const form = e.target as HTMLFormElement;
-                         const title = (form.elements.namedItem('title') as HTMLInputElement).value;
-                         const priority = (form.elements.namedItem('priority') as HTMLSelectElement).value as Priority;
-                         const cat = (form.elements.namedItem('category') as HTMLSelectElement).value as Category;
-                         const goalId = (form.elements.namedItem('goalId') as HTMLSelectElement).value;
-                         addRoutine(title, priority, cat, goalId || undefined);
-                         form.reset();
-                     }} className="flex flex-col gap-3 md:gap-4">
-                         <input name="title" placeholder="Nova rotina..." className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded focus:border-app-red outline-none" required />
-                         <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-                             <select name="priority" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 <option value={Priority.HIGH}>Alta (Vermelho)</option>
-                                 <option value={Priority.MODERATE}>Moderada (Dourado)</option>
-                                 <option value={Priority.LOW}>Baixa (Cinza)</option>
-                             </select>
-                             <select name="category" className="bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none flex-1">
-                                 {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                             </select>
-                         </div>
-                         <div>
-                            <select name="goalId" className="w-full bg-app-input p-3 text-xs md:text-base text-app-text border border-app-border rounded outline-none">
-                                <option value="">-- Associar a uma Meta (Opcional) --</option>
-                                {appState.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-                            </select>
-                         </div>
-                         <button className="bg-app-text text-app-bg font-bold uppercase p-3 text-xs md:text-sm hover:opacity-80 transition-colors">Adicionar Rotina</button>
-                     </form>
+                 <div className="flex justify-between items-center mb-4 md:mb-6">
+                     <h2 className="text-lg md:text-2xl font-bold text-app-text">Editor de Rotinas</h2>
+                     <button onClick={() => setShowRoutineCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded">
+                         <Plus size={16} /> <span className="hidden md:inline">Nova Rotina</span><span className="md:hidden">Nova</span>
+                     </button>
                  </div>
+                 
                  <div className="space-y-2">
                      <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
                  </div>
@@ -1164,7 +1157,6 @@ function App() {
                                                 <button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>
                                                     {task.isCompleted && <Check size={12} className="text-black"/>}
                                                 </button>
-                                                <input type="time" value={task.time} onChange={(e) => updateTaskTime(goal.id, task.id, e.target.value)} className="bg-transparent text-[10px] md:text-xs text-app-subtext border-b border-app-border focus:border-app-gold outline-none w-14 md:w-16 text-center shrink-0 cursor-pointer mt-0.5" />
                                                 <span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span>
                                                 <button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button>
                                             </div>

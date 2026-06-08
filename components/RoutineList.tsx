@@ -66,10 +66,10 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, on
               ${isCompleted ? 'opacity-50' : 'hover:bg-app-hover'}
             `}
           >
-            {/* Clickable Area for Toggling Main Routine */}
+            {/* Clickable Area for Opening Details */}
             <div 
                 className="flex items-start gap-2 md:gap-3 flex-1 cursor-pointer select-none"
-                onClick={() => onToggle(routine.id)}
+                onClick={() => onOpenDetails(routine)}
             >
                 <div 
                   className={`

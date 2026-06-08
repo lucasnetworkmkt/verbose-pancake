@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, Link, File, Save, ArrowLeft, Star } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, Link, File, Save, ArrowLeft, Star, Maximize2, Minimize2 } from 'lucide-react';
 import { Note, Category, Goal, DocumentItem, MediaFile } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,6 +45,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   const [editGoalId, setEditGoalId] = useState<string>('');
   const [editDocumentId, setEditDocumentId] = useState<string>('');
   const [editIsFavorite, setEditIsFavorite] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Initialize editor when selection changes
   useEffect(() => {
@@ -143,7 +144,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
   };
 
   return (
-    <div className="min-h-full flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-4">
         {/* Main Section Tabs */}
         <div className="flex gap-4 border-b border-app-border pb-2 overflow-x-auto shrink-0">
             <button 
@@ -185,10 +186,10 @@ const NotesManager: React.FC<NotesManagerProps> = ({
         )}
         
         {activeTab === 'TEXT' && (
-            <div className="flex flex-col md:flex-row flex-1 md:h-[calc(100vh-190px)] gap-6">
+            <div className="flex flex-col md:flex-row flex-1 h-[calc(100vh-270px)] md:h-[calc(100vh-190px)] min-h-0 gap-6">
             
             {/* LEFT COLUMN: LIST */}
-            <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedNoteId ? 'hidden md:flex' : 'flex'} md:h-full`}>
+            <div className={`w-full md:w-1/3 flex-col gap-4 ${selectedNoteId ? 'hidden md:flex' : 'flex'} h-full min-h-0`}>
                 <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-app-subtext" size={16} />
@@ -274,7 +275,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
             </div>
 
             {/* RIGHT COLUMN: EDITOR */}
-            <div className={`w-full md:w-2/3 bg-app-card border border-app-border rounded-lg flex-col relative ${!selectedNoteId ? 'hidden md:flex' : 'flex'} md:overflow-hidden`}>
+            <div className={`w-full md:w-2/3 flex-col relative ${!selectedNoteId ? 'hidden md:flex' : 'flex'} md:overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 text-editor-sheet !w-full !h-full !max-h-screen !rounded-none !border-none !m-0 p-0 shadow-2xl' : 'bg-app-card border border-app-border rounded-lg h-full'}`}>
                 {!selectedNoteId ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-app-subtext p-8">
                     <FileText size={48} className="mb-4 opacity-20" />
@@ -283,7 +284,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                 ) : (
                 <>
                     {/* Editor Toolbar */}
-                    <div className="p-3 md:p-4 border-b border-app-border flex flex-wrap gap-2 md:gap-4 items-center bg-app-input shrink-0 sticky top-0 z-10">
+                    <div className="p-3 md:p-4 border-b border-app-border flex flex-wrap gap-2 md:gap-4 items-center bg-app-input shrink-0 z-10 rounded-t-lg">
                     
                     <button 
                         onClick={() => setSelectedNoteId(null)}
@@ -313,7 +314,7 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                         />
                     </div>
                     
-                    <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex gap-2 w-full md:w-auto items-center">
                         <select 
                             value={editCategory}
                             onChange={e => { 
@@ -351,6 +352,14 @@ const NotesManager: React.FC<NotesManagerProps> = ({
                             <option value="">-- Sem Link --</option>
                             {documents.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
                         </select>
+                        
+                        <button 
+                            onClick={() => setIsFullscreen(!isFullscreen)}
+                            className="p-2 text-app-subtext hover:text-app-text transition-colors rounded hover:bg-app-card border border-transparent hover:border-app-border"
+                            title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+                        >
+                            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        </button>
                     </div>
                     
                     {selectedNoteId === 'NEW' && (

@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Bold, Palette, Minus, Plus, Type } from 'lucide-react';
+import { Bold, Palette, Heading1, Heading2, Type } from 'lucide-react';
 
 interface RichTextEditorProps {
   content: string;
@@ -12,20 +12,17 @@ interface RichTextEditorProps {
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, className }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const isInternalUpdate = useRef(false);
-  const savedRange = useRef<Range | null>(null); // Armazena a seleção do usuário
+  const savedRange = useRef<Range | null>(null);
 
-  // Sincroniza o conteúdo inicial ou externo
   useEffect(() => {
     if (editorRef.current && !isInternalUpdate.current) {
         if (editorRef.current.innerHTML !== content) {
             editorRef.current.innerHTML = content;
         }
     }
-    // Reset flag after external update effect
     isInternalUpdate.current = false;
   }, [content]);
 
-  // Salva a posição do cursor/seleção sempre que o usuário mexe no texto
   const saveSelection = () => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
@@ -33,7 +30,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
     }
   };
 
-  // Restaura a seleção antes de aplicar um comando
   const restoreSelection = () => {
     const selection = window.getSelection();
     if (selection && savedRange.current) {
@@ -52,58 +48,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
   };
 
   const execCmd = (command: string, value: string | undefined = undefined) => {
-    // 1. Restaura a seleção para o comando aplicar no texto certo
     restoreSelection();
-    
-    // 2. Executa o comando
     document.execCommand(command, false, value);
-    
-    // 3. Foca de volta no editor e salva o novo estado
     if (editorRef.current) {
         editorRef.current.focus();
     }
     handleInput();
   };
 
-  // Lógica inteligente para aumentar/diminuir fonte gradualmente na escala 1-7
-  const handleFontSize = (e: React.MouseEvent, delta: number) => {
-    e.preventDefault();
-    restoreSelection();
-
-    // Tenta descobrir o tamanho atual.
-    // O browser pode retornar "3" (escala) ou "16px" (computado).
-    const queryVal = document.queryCommandValue('FontSize');
-    let currentSize = 3; // Default (16px)
-
-    if (queryVal) {
-        if (/^[1-7]$/.test(queryVal)) {
-            // Se já retornou na escala 1-7
-            currentSize = parseInt(queryVal);
-        } else {
-            // Se retornou pixels, mapeamos para a nossa escala customizada (ver CSS abaixo)
-            const pxVal = parseInt(queryVal);
-            if (!isNaN(pxVal)) {
-                if (pxVal <= 11) currentSize = 1;      // ~10px
-                else if (pxVal <= 13) currentSize = 2; // ~13px
-                else if (pxVal <= 16) currentSize = 3; // ~16px (Normal)
-                else if (pxVal <= 18) currentSize = 4; // ~18px
-                else if (pxVal <= 21) currentSize = 5; // ~21px
-                else if (pxVal <= 24) currentSize = 6; // ~24px
-                else currentSize = 7;                  // ~28px+
-            }
-        }
-    }
-
-    let newSize = currentSize + delta;
-    if (newSize < 1) newSize = 1;
-    if (newSize > 7) newSize = 7;
-
-    execCmd('fontSize', newSize.toString());
-  };
-
-  // Previne que o botão roube o foco ao ser clicado (usa onMouseDown em vez de onClick)
   const handleMouseDown = (e: React.MouseEvent, command: string, value?: string) => {
-    e.preventDefault(); // CRUCIAL: Impede perda de foco
+    e.preventDefault();
     execCmd(command, value);
   };
 
@@ -126,30 +80,29 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
 
         <div className="h-4 w-[1px] bg-app-border mx-1"></div>
 
-        {/* Botões de Fonte Gradual */}
+        {/* Botões de Formatação */}
         <button 
-          onMouseDown={(e) => handleFontSize(e, -1)} 
-          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1"
-          title="Diminuir Fonte"
+          onMouseDown={(e) => handleMouseDown(e, 'formatBlock', 'H1')} 
+          className="px-2 py-1 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1 text-xs font-bold"
+          title="Título (H1)"
         >
-            <Minus size={14} /> <span className="text-[10px] font-bold">A</span>
+            <Heading1 size={14} /> Título
         </button>
 
         <button 
-          onMouseDown={(e) => handleFontSize(e, 0)} // Reseta para 3 (Normal)
-          onClick={() => execCmd('fontSize', '3')}
-          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text"
-          title="Tamanho Normal (16px)"
+          onMouseDown={(e) => handleMouseDown(e, 'formatBlock', 'H2')} 
+          className="px-2 py-1 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1 text-xs font-bold"
+          title="Subtítulo (H2)"
         >
-            <Type size={16} />
+            <Heading2 size={14} /> Subtítulo
         </button>
 
         <button 
-          onMouseDown={(e) => handleFontSize(e, 1)} 
-          className="p-1.5 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1"
-          title="Aumentar Fonte"
+          onMouseDown={(e) => handleMouseDown(e, 'formatBlock', 'P')} 
+          className="px-2 py-1 rounded hover:bg-app-hover text-app-subtext hover:text-app-text flex items-center gap-1 text-xs font-bold"
+          title="Texto Normal (P)"
         >
-            <Plus size={14} /> <span className="text-xs font-bold">A</span>
+            <Type size={14} /> Normal
         </button>
         
         <div className="h-4 w-[1px] bg-app-border mx-1"></div>
@@ -167,24 +120,54 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         </div>
       </div>
 
-      {/* Editable Area */}
-      <div 
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onMouseUp={saveSelection}
-        onKeyUp={saveSelection}
-        onBlur={saveSelection}
-        className="flex-1 p-4 bg-app-card text-app-text outline-none overflow-y-auto text-sm md:text-base leading-relaxed rich-editor-content"
-        style={{ minHeight: '150px' }}
-      ></div>
+      {/* Editable Area Wrapper */}
+      <div className="flex-1 text-editor-sheet overflow-y-auto flex justify-center p-0 rounded-b">
+        <div 
+          ref={editorRef}
+          contentEditable
+          onInput={handleInput}
+          onMouseUp={saveSelection}
+          onKeyUp={saveSelection}
+          onBlur={saveSelection}
+          className="w-full text-editor-sheet outline-none rich-editor-content px-2 py-4 md:px-4 md:py-6 transition-all"
+          style={{ minHeight: '100%' }}
+        ></div>
+      </div>
 
       <style>{`
-        /* FORÇA O ESTILO APESAR DO RESET DO TAILWIND */
+        .text-editor-sheet {
+            background-color: #000000;
+        }
+        [data-theme='light'] .text-editor-sheet {
+            background-color: #FFFFFF;
+        }
+
+        .rich-editor-content {
+           font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+           line-height: 1.625 !important;
+           font-size: 16px !important;
+           color: #E5E5E5 !important;
+        }
+        [data-theme='light'] .rich-editor-content {
+           color: #374151 !important;
+        }
+
+        /* Limpa estilos antigos deixados pelo fontSize anterior ou spans */
+        .rich-editor-content font,
+        .rich-editor-content span {
+            font-size: inherit !important;
+            font-family: inherit !important;
+            line-height: inherit !important;
+        }
+
         .rich-editor-content b, 
         .rich-editor-content strong { 
-            font-weight: 900 !important;
-            /* Cor removida para usar a cor atual do texto */
+            font-weight: 700 !important;
+            color: #FFFFFF !important;
+        }
+        [data-theme='light'] .rich-editor-content b, 
+        [data-theme='light'] .rich-editor-content strong {
+            color: #111827 !important;
         }
         
         .rich-editor-content i, 
@@ -194,25 +177,74 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
 
         .rich-editor-content u { 
             text-decoration: underline !important; 
+            text-underline-offset: 2px !important;
+        }
+        
+        .rich-editor-content h1,
+        .rich-editor-content h1 * {
+            font-size: 1.875rem !important; 
+            font-weight: 800 !important;
+            line-height: 1.2 !important;
+            color: #FFFFFF !important;
+        }
+        [data-theme='light'] .rich-editor-content h1,
+        [data-theme='light'] .rich-editor-content h1 * {
+            color: #111827 !important;
         }
 
-        /* 
-           REMAPEAMENTO DA ESCALA 1-7 PARA PIXELS SUAVES 
-           (Evita saltos gigantes como 16px -> 32px)
-        */
-        .rich-editor-content font[size="1"] { font-size: 10px !important; }
-        .rich-editor-content font[size="2"] { font-size: 13px !important; }
-        .rich-editor-content font[size="3"] { font-size: 16px !important; } /* Padrão */
-        .rich-editor-content font[size="4"] { font-size: 18px !important; } /* Aumento suave */
-        .rich-editor-content font[size="5"] { font-size: 21px !important; }
-        .rich-editor-content font[size="6"] { font-size: 24px !important; }
-        .rich-editor-content font[size="7"] { font-size: 28px !important; }
+        .rich-editor-content h1 {
+            margin-top: 1.5em !important;
+            margin-bottom: 0.5em !important;
+            border-bottom: 2px solid #333333 !important;
+            padding-bottom: 0.25em !important;
+        }
+        [data-theme='light'] .rich-editor-content h1 {
+            border-bottom: 2px solid #f3f4f6 !important;
+        }
+
+        .rich-editor-content h1:first-child {
+            margin-top: 0 !important;
+        }
+        
+        .rich-editor-content h2,
+        .rich-editor-content h2 * {
+            font-size: 1.5rem !important;
+            font-weight: 700 !important;
+            line-height: 1.3 !important;
+            color: #E5E5E5 !important;
+        }
+        [data-theme='light'] .rich-editor-content h2,
+        [data-theme='light'] .rich-editor-content h2 * {
+            color: #1f2937 !important;
+        }
+
+        .rich-editor-content h2 {
+            margin-top: 1.25em !important;
+            margin-bottom: 0.5em !important;
+        }
+        
+        .rich-editor-content p, 
+        .rich-editor-content div {
+            font-size: 16px !important;
+            line-height: 1.625 !important;
+            margin-bottom: 0.75em !important;
+            margin-top: 0 !important;
+            min-height: 1.625em !important; 
+            color: inherit !important;
+        }
+
+        .rich-editor-content p:last-child {
+            margin-bottom: 0 !important;
+        }
 
         .rich-editor-content[contenteditable]:empty::before {
             content: "${placeholder || ''}";
-            color: gray;
+            color: #6B7280;
             pointer-events: none;
             display: block;
+        }
+        [data-theme='light'] .rich-editor-content[contenteditable]:empty::before {
+            color: #9ca3af;
         }
       `}</style>
     </div>

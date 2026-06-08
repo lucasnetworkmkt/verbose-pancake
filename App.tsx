@@ -1350,7 +1350,7 @@ function App() {
           )}
 
           {/* NOTES TAB */}
-          {activeTab === 'NOTES' && <div className="min-h-full"><NotesManager notes={userNotes} documents={userDocuments} files={userFiles} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddFile={handleAddFile} onUpdateFile={handleUpdateFile} onDeleteFile={handleDeleteFile} /></div>}
+          {activeTab === 'NOTES' && <div className="h-full"><NotesManager notes={userNotes} documents={userDocuments} files={userFiles} goals={appState.goals} onAddNote={handleAddNote} onUpdateNote={handleUpdateNote} onDeleteNote={handleDeleteNote} onAddDocument={handleAddDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument} onAddFile={handleAddFile} onUpdateFile={handleUpdateFile} onDeleteFile={handleDeleteFile} /></div>}
 
           {/* FINANCE TAB */}
           {activeTab === 'FINANCE' && appState.user && <div className="h-full"><FinanceManager user={appState.user} /></div>}

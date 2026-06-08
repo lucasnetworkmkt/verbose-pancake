@@ -32,7 +32,9 @@ import {
   ChevronDown,
   User as UserIcon,
   DollarSign,
-  Grid
+  Grid,
+  ExternalLink,
+  Settings
 } from 'lucide-react';
 import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile, DayOfWeek } from './types';
 import { authService, dataService, fileService } from './services/storage';
@@ -44,6 +46,7 @@ import HistoryDashboard from './components/HistoryDashboard';
 import GoalCreator from './components/GoalCreator';
 import RoutineCreator from './components/RoutineCreator';
 import RoutineDetailsModal from './components/RoutineDetailsModal';
+import GoalDetailsModal from './components/GoalDetailsModal';
 import ExecutionTimer from './components/ExecutionTimer';
 import NotesManager from './components/NotesManager';
 import EvolutionMap from './components/EvolutionMap';
@@ -432,6 +435,8 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
   const [isRoutineDetailsReadOnly, setIsRoutineDetailsReadOnly] = useState(false);
+  const [selectedGoalForDetails, setSelectedGoalForDetails] = useState<Goal | null>(null);
+  const [isGoalDetailsReadOnly, setIsGoalDetailsReadOnly] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
 
   useEffect(() => {
@@ -640,6 +645,15 @@ function App() {
       if (selectedRoutineForDetails?.id === updatedRoutine.id) setSelectedRoutineForDetails(updatedRoutine);
   };
 
+  const handleUpdateGoal = (updatedGoal: Goal) => {
+      setAppState(prev => {
+          if(!prev) return null;
+          const updatedGoals = prev.goals.map(g => g.id === updatedGoal.id ? updatedGoal : g);
+          return {...prev, goals: updatedGoals};
+      });
+      if (selectedGoalForDetails?.id === updatedGoal.id) setSelectedGoalForDetails(updatedGoal);
+  };
+
   const handleCreateGoal = (data: { title: string; description: string; deadline: string; category: Category; priority: Priority }) => {
       setAppState(prev => {
           if(!prev) return null;
@@ -724,11 +738,28 @@ function App() {
   };
 
   // Evolution Handlers (Level 1, 2, 3)...
-  const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution!, startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado. Relógio rodando."); };
-  const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution, completedDays: [...currentCompleted, day] } }; } return prev; }); };
+  // --- RESTART CHALLENGE ---
+  const handleRestartLevel = (level: 1 | 2 | 3) => {
+      if (window.confirm(`Tem certeza que deseja reiniciar o Nível ${level}? Todo o seu progresso neste nível voltará para o dia 0.`)) {
+          setAppState(prev => {
+              if(!prev) return null;
+              if (level === 1) {
+                  return { ...prev, evolution: { ...prev.evolution, completedDays: [], startDate: null, lastCompletionDate: null }};
+              } else if (level === 2) {
+                  return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: [], startDateLevel2: null, lastCompletionDateLevel2: null }};
+              } else {
+                  return { ...prev, evolution: { ...prev.evolution!, level3: { isStarted: false, startDate: null, completedDays: [], lastCompletionDate: null }}};
+              }
+          });
+          showToast(`Nível ${level} Reiniciado.`);
+      }
+  };
+
+  const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution, completedDays: [...currentCompleted, day], lastCompletionDate: new Date().toISOString() } }; } return prev; }); };
   const handleUndoEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; return { ...prev, evolution: { ...prev.evolution, completedDays: currentCompleted.filter(d => d !== day) } }; }); };
+  const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution, startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado."); };
   const handleStartLevel2 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution!, startDateLevel2: new Date().toISOString() } }) : null); showToast("Nível 2 Iniciado. Sem volta."); };
-  const handleCompleteEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; if (!currentCompleted.includes(day)) { showToast(`Nível 2: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: [...currentCompleted, day] } }; } return prev; }); };
+  const handleCompleteEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; if (!currentCompleted.includes(day)) { showToast(`Nível 2: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: [...currentCompleted, day], lastCompletionDateLevel2: new Date().toISOString() } }; } return prev; }); };
   const handleUndoEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: currentCompleted.filter(d => d !== day) } }; }); };
   const handleStartLevel3 = () => { setAppState(prev => { if(!prev || !prev.evolution) return null; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...prev.evolution, level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
   const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...prev.evolution, level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
@@ -883,6 +914,7 @@ function App() {
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
       <RoutineCreator isOpen={showRoutineCreator} onClose={() => setShowRoutineCreator(false)} onCreate={addRoutine} goals={appState.goals} />
       <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => { setSelectedRoutineForDetails(null); setIsRoutineDetailsReadOnly(false); }} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} readOnly={isRoutineDetailsReadOnly} />
+      <GoalDetailsModal isOpen={!!selectedGoalForDetails} onClose={() => { setSelectedGoalForDetails(null); setIsGoalDetailsReadOnly(false); }} goal={selectedGoalForDetails} onUpdateGoal={handleUpdateGoal} readOnly={isGoalDetailsReadOnly} />
 
       {/* MOBILE NAV OVERLAY */}
       {isMobileMenuOpen && (
@@ -1115,6 +1147,7 @@ function App() {
                 onStartLevel2={handleStartLevel2}
                 onStartLevel3={handleStartLevel3}
                 onCompleteDayLevel3={handleCompleteEvolutionDayLevel3}
+                onRestartLevel={handleRestartLevel}
              />
           )}
 
@@ -1149,52 +1182,67 @@ function App() {
                     <h2 className="text-lg md:text-2xl font-bold text-app-text">Metas & Objetivos</h2>
                     <button onClick={() => setShowGoalCreator(true)} className="bg-app-red text-white px-3 py-2 md:px-4 text-[10px] md:text-sm uppercase font-bold flex items-center gap-2 hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20 rounded"><Plus size={16} /> <span className="hidden md:inline">Nova Meta</span><span className="md:hidden">Nova</span></button>
                 </div>
-                <div className="grid gap-4 md:gap-8">
+                <div className="grid gap-3 md:gap-4">
                     {appState.goals.map(goal => {
                         const borderColor = getPriorityBorderClass(goal.priority);
                         const progress = goal.tasks.length > 0 ? Math.round((goal.tasks.filter(t => t.isCompleted).length / goal.tasks.length) * 100) : 0;
                         return (
-                            <div key={goal.id} className={`bg-app-card border-t-4 ${borderColor} border-x border-b border-app-border p-4 md:p-6 rounded shadow-lg relative group`}>
-                                <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
-                                    <div className="space-y-1 w-full">
-                                        <div className="flex items-start justify-between md:justify-start gap-3">
-                                            <h3 className="text-lg md:text-2xl font-bold text-app-text break-words leading-tight flex-1">{goal.title}</h3>
-                                            <div className="flex items-center gap-2 shrink-0 mt-1">
-                                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPriorityColor(goal.priority)}}></div>
-                                                <button onClick={(e) => deleteGoal(e, goal.id)} className="p-1 text-app-subtext hover:text-app-red transition-colors" title="Excluir Meta"><Trash2 size={16} /></button>
-                                            </div>
-                                        </div>
-                                        <p className="text-app-subtext text-xs md:text-sm max-w-xl break-words">{goal.description}</p>
-                                    </div>
-                                    <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto justify-between md:justify-start">
-                                        <span className="bg-app-input px-2 py-1 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span>
-                                        <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline}</span>
-                                    </div>
+                          <div 
+                            key={goal.id}
+                            className={`
+                              relative p-4 md:p-5 bg-app-card border-l-[3px] md:border-l-4 ${borderColor} 
+                              transition-all duration-200 shadow-sm border border-y-app-border border-r-app-border rounded
+                              hover:bg-app-hover flex items-center justify-between
+                            `}
+                          >
+                            <div className="flex flex-col gap-1 min-w-0 pr-4 flex-1">
+                                <h3 className="text-sm md:text-lg font-bold text-app-text break-words leading-tight">{goal.title}</h3>
+                                <div className="flex flex-wrap items-center gap-3 mt-1">
+                                   <span className="bg-app-input px-2 py-0.5 text-[10px] md:text-xs rounded text-app-text border border-app-border uppercase tracking-wider whitespace-nowrap">{goal.category}</span>
+                                   <span className="text-[10px] md:text-xs text-app-red font-bold flex items-center gap-1 whitespace-nowrap"><Clock size={12}/> {goal.deadline}</span>
                                 </div>
-                                <div className="mb-4 md:mb-6">
-                                    <div className="flex justify-between text-[10px] md:text-xs uppercase text-app-subtext mb-1"><span>Progresso</span><span>{progress}%</span></div>
-                                    <div className="w-full bg-app-input h-1.5 md:h-2 rounded-full border border-app-border"><div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div></div>
-                                </div>
-                                <div className="bg-app-input p-3 md:p-4 rounded border border-app-border">
-                                    <h4 className="text-[10px] md:text-xs text-app-subtext uppercase font-bold mb-3 flex items-center gap-2"><ListTodo size={14}/> Micro Tarefas</h4>
-                                    <div className="space-y-2 mb-4">
-                                        {goal.tasks.length === 0 && <p className="text-app-subtext text-xs italic">Nenhuma micro tarefa definida.</p>}
-                                        {goal.tasks.map(task => (
-                                            <div key={task.id} className="flex items-start gap-2 md:gap-3 group py-1">
-                                                <button onClick={() => toggleGoalTask(goal.id, task.id)} className={`w-4 h-4 md:w-5 md:h-5 rounded border flex items-center justify-center transition-colors shrink-0 mt-0.5 ${task.isCompleted ? 'bg-app-gold border-app-gold' : 'border-app-subtext hover:border-app-text'}`}>
-                                                    {task.isCompleted && <Check size={12} className="text-black"/>}
-                                                </button>
-                                                <span className={`flex-1 text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>{task.title}</span>
-                                                <button onClick={() => deleteGoalTask(goal.id, task.id)} className="text-app-subtext hover:text-app-red transition-opacity p-1 mt-0.5" title="Excluir tarefa"><Trash2 size={14} /></button>
-                                            </div>
-                                        ))}
+                                
+                                <div className="mt-3 w-full max-w-sm">
+                                    <div className="flex justify-between text-[10px] uppercase text-app-subtext mb-1">
+                                        <span>Progresso</span>
+                                        <span>{progress}%</span>
                                     </div>
-                                    <form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem('taskTitle') as HTMLInputElement; if(input.value) { addTaskToGoal(goal.id, input.value); input.value = ''; } }} className="flex gap-2 border-t border-app-border pt-3">
-                                        <input name="taskTitle" placeholder="+ Tarefa" className="bg-transparent flex-1 text-xs md:text-sm text-app-text placeholder-app-subtext outline-none min-w-0" />
-                                        <button className="text-[10px] md:text-xs text-app-gold uppercase font-bold hover:text-white shrink-0"><span className="hidden md:inline">Adicionar</span><span className="md:hidden"><Plus size={16}/></span></button>
-                                    </form>
+                                    <div className="w-full bg-app-input h-1.5 rounded-full border border-app-border overflow-hidden">
+                                        <div className="bg-app-gold h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`}}></div>
+                                    </div>
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-1 md:gap-2 shrink-0 ml-2">
+                                {/* Access Button (Read Only) */}
+                                <button 
+                                    type="button"
+                                    onClick={() => { setSelectedGoalForDetails(goal); setIsGoalDetailsReadOnly(true); }}
+                                    className="bg-app-red hover:bg-red-700 text-white px-2 py-1.5 md:px-3 md:py-2 rounded text-xs font-bold uppercase transition-colors flex items-center gap-1.5"
+                                    title="Acessar"
+                                >
+                                    <ExternalLink size={14} className="md:w-4 md:h-4" />
+                                    <span className="hidden md:inline">Acessar</span>
+                                </button>
+                                
+                                {/* Edit Button */}
+                                <button 
+                                    onClick={() => { setSelectedGoalForDetails(goal); setIsGoalDetailsReadOnly(false); }}
+                                    className="p-1.5 md:p-2 text-app-subtext hover:text-app-text hover:bg-app-hover rounded transition-colors"
+                                    title="Editar Meta"
+                                >
+                                    <Settings size={18} />
+                                </button>
+                                
+                                <button 
+                                    onClick={(e) => deleteGoal(e, goal.id)} 
+                                    className="p-1.5 md:p-2 text-app-subtext hover:text-app-red hover:bg-app-red/10 rounded transition-colors" 
+                                    title="Excluir Meta"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                          </div>
                         );
                     })}
                 </div>

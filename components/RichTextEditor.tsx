@@ -182,7 +182,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         
         .rich-editor-content h1,
         .rich-editor-content h1 * {
-            font-size: 1.875rem !important; 
+            font-size: 24px !important; 
             font-weight: 800 !important;
             line-height: 1.2 !important;
             color: #FFFFFF !important;
@@ -208,7 +208,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
         
         .rich-editor-content h2,
         .rich-editor-content h2 * {
-            font-size: 1.5rem !important;
+            font-size: 20px !important;
             font-weight: 700 !important;
             line-height: 1.3 !important;
             color: #E5E5E5 !important;

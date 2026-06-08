@@ -639,10 +639,75 @@ function App() {
   const handleUpdateRoutine = (updatedRoutine: Routine) => {
       setAppState(prev => {
           if(!prev) return null;
-          const updatedRoutines = prev.routines.map(r => r.id === updatedRoutine.id ? updatedRoutine : r);
-          return {...prev, routines: updatedRoutines};
+
+          let updatedDayLogs = prev.dayLogs;
+          let finalRoutine = updatedRoutine;
+
+          const todayStr = format(new Date(), 'yyyy-MM-dd');
+          const jsDayIndex = new Date().getDay(); 
+          const dayMap: Record<number, DayOfWeek> = {
+              0: DayOfWeek.SUNDAY,
+              1: DayOfWeek.MONDAY,
+              2: DayOfWeek.TUESDAY,
+              3: DayOfWeek.WEDNESDAY,
+              4: DayOfWeek.THURSDAY,
+              5: DayOfWeek.FRIDAY,
+              6: DayOfWeek.SATURDAY
+          };
+          const todayEnum = dayMap[jsDayIndex];
+          const todayTasks = finalRoutine.routineTasks?.[todayEnum] || [];
+          
+          if (todayTasks.length > 0) {
+              const allCompletedToday = todayTasks.every(t => t.isCompleted);
+              const log = updatedDayLogs[todayStr] || { date: todayStr, completedRoutineIds: [], mode: DayMode.NORMAL, isValid: false };
+              let newCompletedIds = [...log.completedRoutineIds];
+              
+              if (allCompletedToday && !newCompletedIds.includes(finalRoutine.id)) {
+                  newCompletedIds.push(finalRoutine.id);
+                  setTimeout(() => showToast(`Rotina '${finalRoutine.title}' concluída hoje!`), 100);
+              } else if (!allCompletedToday && newCompletedIds.includes(finalRoutine.id)) {
+                  newCompletedIds = newCompletedIds.filter(id => id !== finalRoutine.id);
+              }
+              
+              updatedDayLogs = {
+                  ...updatedDayLogs,
+                  [todayStr]: { ...log, completedRoutineIds: newCompletedIds }
+              };
+          }
+
+          // Week Reset Logic
+          const allDaysTasks = Object.values(finalRoutine.routineTasks || {});
+          const hasTasks = allDaysTasks.some(tasks => tasks.length > 0);
+          const allTasksCompleted = hasTasks && allDaysTasks.every(tasks => tasks.every(t => t.isCompleted));
+          
+          if (allTasksCompleted) {
+              const freshTasks = { ...finalRoutine.routineTasks } as Record<DayOfWeek, RoutineTask[]>;
+              for (const d of Object.values(DayOfWeek)) {
+                  if (freshTasks[d]) {
+                      freshTasks[d] = freshTasks[d].map(t => ({ ...t, isCompleted: false }));
+                  }
+              }
+              finalRoutine = { ...finalRoutine, routineTasks: freshTasks };
+              setTimeout(() => showToast(`Semana concluída em '${finalRoutine.title}'! Tarefas reiniciadas.`), 200);
+          }
+
+          const updatedRoutines = prev.routines.map(r => r.id === finalRoutine.id ? finalRoutine : r);
+          return {...prev, routines: updatedRoutines, dayLogs: updatedDayLogs};
       });
-      if (selectedRoutineForDetails?.id === updatedRoutine.id) setSelectedRoutineForDetails(updatedRoutine);
+      // Update selected routine appropriately
+      setAppState(prev => {
+          if (!prev) return prev;
+          const freshRoutine = prev.routines.find(r => r.id === updatedRoutine.id);
+          if (freshRoutine) {
+              setSelectedRoutineForDetails(prevSelection => {
+                  if (prevSelection?.id === updatedRoutine.id) {
+                      return freshRoutine;
+                  }
+                  return prevSelection;
+              });
+          }
+          return prev;
+      });
   };
 
   const handleUpdateGoal = (updatedGoal: Goal) => {

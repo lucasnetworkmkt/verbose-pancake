@@ -69,7 +69,7 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, on
             {/* Clickable Area for Opening Details */}
             <div 
                 className="flex items-start gap-2 md:gap-3 flex-1 cursor-pointer select-none"
-                onClick={() => onOpenDetails(routine)}
+                onClick={() => onOpenDetails?.(routine)}
             >
                 <div 
                   className={`

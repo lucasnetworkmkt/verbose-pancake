@@ -13,6 +13,7 @@ interface EvolutionMapProps {
   onStartLevel2: () => void;
   onStartLevel3: () => void;
   onCompleteDayLevel3: (day: number) => void;
+  onRestartLevel: (level: 1 | 2 | 3) => void;
 }
 
 type ViewMode = 'SELECTION' | 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3';
@@ -26,7 +27,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   onStartLevel1,
   onStartLevel2,
   onStartLevel3,
-  onCompleteDayLevel3
+  onCompleteDayLevel3,
+  onRestartLevel
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('SELECTION');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -49,45 +51,56 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const isLevel2Complete = (evolutionState.completedDaysLevel2?.length || 0) >= 40;
   
   // Calculate Time Unlocks
-  const calculateUnlockedDayByTime = (startDateStr?: string | null) => {
-      if (!startDateStr) return 0;
-      const start = new Date(startDateStr).getTime();
-      const diff = currentTime - start;
-      if (diff < 0) return 0;
-      // Day 1 unlocks at t=0. Day 2 unlocks at t=24h.
-      // So day N is unlocked if diff >= (N-1)*24h
-      // N-1 <= diff/24h -> N <= diff/24h + 1
-      return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  const getNextUnlockTime = (lastCompletionStr: string | null, startDateStr: string | null) => {
+    if (!startDateStr) return null; // Não começou
+    if (!lastCompletionStr) return null; // Começou mas n fez nada, logo, liberado 100% o dia 1. Mas a função não calcula pro dia 1. A liberação pro dia 1 é garantida abaixo.
+    
+    // "libera todos os dias a 1 da manhã"
+    const d = new Date(lastCompletionStr);
+    const unlock = new Date(d);
+    
+    // Se foi feito antes de 1 da manhã, libera hoje a 1 da manhã (ou seja, se a pessoa fez 00:30, libera 1:00 do próprio dia).
+    // Se fez depois de 1 da manhã, libera só no próximo dia as 1 da manhã.
+    if (d.getHours() < 1) {
+        unlock.setHours(1, 0, 0, 0);
+    } else {
+        unlock.setDate(unlock.getDate() + 1);
+        unlock.setHours(1, 0, 0, 0);
+    }
+    return unlock.getTime();
   };
 
-  const getUnlockTimeForDay = (startDateStr: string | null, day: number) => {
-      if(!startDateStr) return null;
-      const start = new Date(startDateStr).getTime();
-      return start + (day - 1) * 24 * 60 * 60 * 1000;
+  const calculateUnlockedDayByTime = (lastCompletionStr: string | null, maxCompletedDay: number, startDateStr: string | null) => {
+      if (!startDateStr) return 0;
+      if (!lastCompletionStr) return 1; // Unlocks Day 1 immediately upon starting
+
+      const unlockTime = getNextUnlockTime(lastCompletionStr, startDateStr);
+      if (!unlockTime) return maxCompletedDay;
+
+      // Se já passou da hora de liberação
+      if (currentTime >= unlockTime) {
+          return maxCompletedDay + 1; // Liberou o próximo!
+      }
+      return maxCompletedDay; // Aguardando liberação
   };
 
   // Level 1 Logic
   const l1Started = !!evolutionState.startDate;
-  const l1TimeAllowedDay = calculateUnlockedDayByTime(evolutionState.startDate);
   const l1CompletedMax = evolutionState.completedDays.length > 0 ? Math.max(...evolutionState.completedDays) : 0;
-  // Next unlocked is the sequential day, BUT limited by time.
+  const l1TimeAllowedDay = calculateUnlockedDayByTime(evolutionState.lastCompletionDate || null, l1CompletedMax, evolutionState.startDate || null);
   const l1NextSequential = l1CompletedMax + 1; 
-  // The actual unlocked day for interaction is min(timeAllowed, sequential)
-  // BUT we render up to 40 nodes.
-  // A node is "Time Locked" if day > l1TimeAllowedDay.
-  // A node is "Sequential Locked" if day > l1NextSequential.
 
   // Level 2 Logic
   const l2Started = !!evolutionState.startDateLevel2;
-  const l2TimeAllowedDay = calculateUnlockedDayByTime(evolutionState.startDateLevel2);
   const l2CompletedMax = (evolutionState.completedDaysLevel2?.length || 0) > 0 ? Math.max(...(evolutionState.completedDaysLevel2 || [])) : 0;
+  const l2TimeAllowedDay = calculateUnlockedDayByTime(evolutionState.lastCompletionDateLevel2 || null, l2CompletedMax, evolutionState.startDateLevel2 || null);
   const l2NextSequential = l2CompletedMax + 1;
 
   // Level 3 Logic
   const level3State = evolutionState.level3 || { isStarted: false, completedDays: [], lastCompletionDate: null, startDate: null };
   const l3Started = level3State.isStarted;
-  const l3TimeAllowedDay = calculateUnlockedDayByTime(level3State.startDate);
   const l3CompletedMax = level3State.completedDays.length > 0 ? Math.max(...level3State.completedDays) : 0;
+  const l3TimeAllowedDay = calculateUnlockedDayByTime(level3State.lastCompletionDate || null, l3CompletedMax, level3State.startDate || null);
   const l3NextSequential = l3CompletedMax + 1;
 
   // --- HELPERS ---
@@ -239,7 +252,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   let nextSequential = l1NextSequential;
   let accentColor = 'text-app-gold border-app-gold';
   let accentHex = COLORS.GOLD;
-  let activeStartDate = evolutionState.startDate;
+  let activeStartDate = evolutionState.startDate || null;
+  let activeLastCompletionDate = evolutionState.lastCompletionDate || null;
 
   if (isL2) {
       challenges = EVOLUTION_CHALLENGES_LEVEL_2;
@@ -248,7 +262,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       nextSequential = l2NextSequential;
       accentColor = 'text-app-red border-app-red';
       accentHex = COLORS.RED;
-      activeStartDate = evolutionState.startDateLevel2;
+      activeStartDate = evolutionState.startDateLevel2 || null;
+      activeLastCompletionDate = evolutionState.lastCompletionDateLevel2 || null;
   } else if (isL3) {
       challenges = EVOLUTION_CHALLENGES_LEVEL_3;
       completedSet = completedSetL3;
@@ -256,7 +271,8 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       nextSequential = l3NextSequential;
       accentColor = 'text-purple-500 border-purple-500';
       accentHex = '#a855f7';
-      activeStartDate = level3State.startDate;
+      activeStartDate = level3State.startDate || null;
+      activeLastCompletionDate = level3State.lastCompletionDate || null;
   }
 
   const handleNodeClick = (day: number) => {
@@ -298,22 +314,37 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const isTimeLocked = selectedDay ? selectedDay > timeAllowedDay : false;
   const canInteract = selectedDay === nextSequential && !isTimeLocked;
   
-  const unlockTimeMs = selectedDay ? getUnlockTimeForDay(activeStartDate, selectedDay) : 0;
+  // Apenas calculamos unlock time pro próximo dia sequencial, pro resto fica travado ou já concluído.
+  const unlockTimeMs = getNextUnlockTime(activeLastCompletionDate, activeStartDate);
   const waitText = unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
 
   return (
     <div className="relative w-full h-full flex flex-col bg-app-bg">
-      <div className="p-6 sticky top-0 bg-app-bg/90 backdrop-blur z-20 border-b border-app-border flex items-center justify-between">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-app-text">
-            <MapPin className={isL3 ? "text-purple-500" : (isL2 ? "text-app-red" : "text-app-gold")} /> 
-            {isL3 ? "NÍVEL 3 - EXECUÇÃO REAL" : (isL2 ? "NÍVEL 2 - AVANÇADO" : "NÍVEL 1 - INICIANTE")}
+      <div className="p-4 md:p-6 sticky top-0 bg-app-bg/90 backdrop-blur z-20 border-b border-app-border flex items-center justify-between gap-4">
+        <h2 className="text-sm md:text-xl font-bold flex items-center gap-1 md:gap-2 text-app-text whitespace-nowrap">
+            <MapPin className={isL3 ? "text-purple-500 w-4 h-4 md:w-6 md:h-6" : (isL2 ? "text-app-red w-4 h-4 md:w-6 md:h-6" : "text-app-gold w-4 h-4 md:w-6 md:h-6")} /> 
+            <span className="hidden md:inline">{isL3 ? "NÍVEL 3 - EXECUÇÃO REAL" : (isL2 ? "NÍVEL 2 - AVANÇADO" : "NÍVEL 1 - INICIANTE")}</span>
+            <span className="md:hidden">{isL3 ? "NÍVEL 3" : (isL2 ? "NÍVEL 2" : "NÍVEL 1")}</span>
         </h2>
-        <button 
-            onClick={() => setViewMode('SELECTION')}
-            className="text-sm font-bold uppercase text-app-subtext hover:text-app-text flex items-center gap-1"
-        >
-            <ChevronLeft size={16} /> Voltar
-        </button>
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {completedSet.size >= 40 && (
+                <button 
+                    onClick={() => {
+                        onRestartLevel(isL3 ? 3 : (isL2 ? 2 : 1));
+                        setViewMode('SELECTION');
+                    }}
+                    className="text-[10px] md:text-xs font-bold uppercase text-app-red hover:text-white border border-app-red hover:bg-app-red px-2 py-1 rounded transition-colors"
+                >
+                    Reiniciar Nível
+                </button>
+            )}
+            <button 
+                onClick={() => setViewMode('SELECTION')}
+                className="text-xs md:text-sm font-bold uppercase text-app-subtext hover:text-app-text flex items-center gap-1"
+            >
+                <ChevronLeft size={16} /> Voltar
+            </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto relative p-8 flex justify-center">
@@ -352,8 +383,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                 const isWaiting = isNextSequential && !nodeTimeAllowed;
                 const isLocked = day > nextSequential;
 
-                const nodeUnlockTime = getUnlockTimeForDay(activeStartDate, day);
-                const nodeWaitText = nodeUnlockTime ? formatWaitTime(nodeUnlockTime) : "";
+                const nodeWaitText = isWaiting && unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
 
                 return (
                     <div 

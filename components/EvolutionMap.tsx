@@ -302,9 +302,9 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   const isSelectedCompleted = selectedDay ? completedSet.has(selectedDay) : false;
   
   // Interaction Rules for Modal
-  // Can interact if: It's the next sequential day AND time allows it.
+  // Can interact if: It's the next sequential day AND time allows it, OR if it's already completed.
   const isTimeLocked = selectedDay ? selectedDay > timeAllowedDay : false;
-  const canInteract = selectedDay === nextSequential && !isTimeLocked;
+  const canInteract = (selectedDay === nextSequential && !isTimeLocked) || isSelectedCompleted;
   
   // Apenas calculamos unlock time pro próximo dia sequencial, pro resto fica travado ou já concluído.
   const unlockTimeMs = getNextUnlockTime(activeLastCompletionDate, activeStartDate);

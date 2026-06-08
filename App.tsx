@@ -36,7 +36,7 @@ import {
   ExternalLink,
   Settings
 } from 'lucide-react';
-import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile, DayOfWeek } from './types';
+import { AppState, User, Goal, Routine, DayLog, DayMode, Priority, Category, MicroTask, ExecutionTimer as TimerState, Note, DocumentItem, EvolutionState, MediaFile, DayOfWeek, RoutineTask } from './types';
 import { authService, dataService, fileService } from './services/storage';
 import { COLORS, getPriorityColor, getPriorityBorderClass, EVOLUTION_CHALLENGES, EVOLUTION_CHALLENGES_LEVEL_2, EVOLUTION_CHALLENGES_LEVEL_3 } from './constants';
 import CheckInModal from './components/CheckInModal';
@@ -571,13 +571,56 @@ function App() {
         const existingLog = prev.dayLogs[todayStr] || { date: todayStr, completedRoutineIds: [], mode: DayMode.NORMAL, isValid: false };
         const isCompleted = existingLog.completedRoutineIds.includes(routineId);
         let newCompletedIds = [...existingLog.completedRoutineIds];
-        if (isCompleted) newCompletedIds = newCompletedIds.filter(id => id !== routineId);
-        else newCompletedIds.push(routineId);
-        const totalRoutines = prev.routines.length;
+        
+        let showCompletedToast = false;
+        
+        if (isCompleted) {
+            newCompletedIds = newCompletedIds.filter(id => id !== routineId);
+        } else {
+            newCompletedIds.push(routineId);
+            showCompletedToast = true;
+        }
+        
+        let updatedRoutines = prev.routines;
+
+        // Week Reset Logic IF we just completed it today
+        if (showCompletedToast) {
+            const routine = prev.routines.find(r => r.id === routineId);
+            if (routine) {
+                const allDaysTasks = Object.values(routine.routineTasks || {});
+                const hasTasks = allDaysTasks.some(tasks => tasks.length > 0);
+                const allTasksCompleted = hasTasks && allDaysTasks.every(tasks => tasks.every(t => t.isCompleted));
+                
+                if (allTasksCompleted) {
+                    const freshTasks = { ...routine.routineTasks } as Record<DayOfWeek, RoutineTask[]>;
+                    for (const d of Object.values(DayOfWeek)) {
+                        if (freshTasks[d]) {
+                            freshTasks[d] = freshTasks[d].map(t => ({ ...t, isCompleted: false }));
+                        }
+                    }
+                    const freshRoutine = { ...routine, routineTasks: freshTasks };
+                    updatedRoutines = prev.routines.map(r => r.id === routineId ? freshRoutine : r);
+                    setTimeout(() => showToast(`Semana concluída em '${routine.title}'! Tarefas reiniciadas.`), 300);
+                    
+                    // Also update the currently open routine if it matches
+                    setTimeout(() => {
+                        setSelectedRoutineForDetails(current => current?.id === routineId ? freshRoutine : current);
+                    }, 0);
+                } else {
+                    setTimeout(() => showToast(`Rotina '${routine.title}' finalizada hoje!`), 100);
+                }
+            }
+        }
+
+        const totalRoutines = updatedRoutines.length;
         const completionRate = totalRoutines > 0 ? newCompletedIds.length / totalRoutines : 0;
         const isValid = completionRate >= prev.settings.validDayThreshold;
         if (!existingLog.isValid && isValid) showToast("Dia VALIDADO. Consistência mantida.");
-        return { ...prev, dayLogs: { ...prev.dayLogs, [todayStr]: { ...existingLog, completedRoutineIds: newCompletedIds, isValid } } };
+        return { 
+            ...prev, 
+            dayLogs: { ...prev.dayLogs, [todayStr]: { ...existingLog, completedRoutineIds: newCompletedIds, isValid } },
+            routines: updatedRoutines
+        };
     });
   };
 
@@ -642,38 +685,6 @@ function App() {
 
           let updatedDayLogs = prev.dayLogs;
           let finalRoutine = updatedRoutine;
-
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const jsDayIndex = new Date().getDay(); 
-          const dayMap: Record<number, DayOfWeek> = {
-              0: DayOfWeek.SUNDAY,
-              1: DayOfWeek.MONDAY,
-              2: DayOfWeek.TUESDAY,
-              3: DayOfWeek.WEDNESDAY,
-              4: DayOfWeek.THURSDAY,
-              5: DayOfWeek.FRIDAY,
-              6: DayOfWeek.SATURDAY
-          };
-          const todayEnum = dayMap[jsDayIndex];
-          const todayTasks = finalRoutine.routineTasks?.[todayEnum] || [];
-          
-          if (todayTasks.length > 0) {
-              const allCompletedToday = todayTasks.every(t => t.isCompleted);
-              const log = updatedDayLogs[todayStr] || { date: todayStr, completedRoutineIds: [], mode: DayMode.NORMAL, isValid: false };
-              let newCompletedIds = [...log.completedRoutineIds];
-              
-              if (allCompletedToday && !newCompletedIds.includes(finalRoutine.id)) {
-                  newCompletedIds.push(finalRoutine.id);
-                  setTimeout(() => showToast(`Rotina '${finalRoutine.title}' concluída hoje!`), 100);
-              } else if (!allCompletedToday && newCompletedIds.includes(finalRoutine.id)) {
-                  newCompletedIds = newCompletedIds.filter(id => id !== finalRoutine.id);
-              }
-              
-              updatedDayLogs = {
-                  ...updatedDayLogs,
-                  [todayStr]: { ...log, completedRoutineIds: newCompletedIds }
-              };
-          }
 
           // Week Reset Logic
           const allDaysTasks = Object.values(finalRoutine.routineTasks || {});
@@ -820,14 +831,14 @@ function App() {
       }
   };
 
-  const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution, completedDays: [...currentCompleted, day], lastCompletionDate: new Date().toISOString() } }; } return prev; }); };
-  const handleUndoEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; return { ...prev, evolution: { ...prev.evolution, completedDays: currentCompleted.filter(d => d !== day) } }; }); };
-  const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution, startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado."); };
-  const handleStartLevel2 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...prev.evolution!, startDateLevel2: new Date().toISOString() } }) : null); showToast("Nível 2 Iniciado. Sem volta."); };
-  const handleCompleteEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; if (!currentCompleted.includes(day)) { showToast(`Nível 2: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: [...currentCompleted, day], lastCompletionDateLevel2: new Date().toISOString() } }; } return prev; }); };
-  const handleUndoEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; return { ...prev, evolution: { ...prev.evolution!, completedDaysLevel2: currentCompleted.filter(d => d !== day) } }; }); };
-  const handleStartLevel3 = () => { setAppState(prev => { if(!prev || !prev.evolution) return null; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...prev.evolution, level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
-  const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...prev.evolution, level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
+  const handleCompleteEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; if (!currentCompleted.includes(day)) { showToast(`Nível 1: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...(prev.evolution as EvolutionState), completedDays: [...currentCompleted, day], lastCompletionDate: new Date().toISOString() } }; } return prev; }); };
+  const handleUndoEvolutionDay = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDays || []; return { ...prev, evolution: { ...(prev.evolution as EvolutionState), completedDays: currentCompleted.filter(d => d !== day) } }; }); };
+  const handleStartLevel1 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...(prev.evolution as EvolutionState), startDate: new Date().toISOString() } }) : null); showToast("Nível 1 Iniciado."); };
+  const handleStartLevel2 = () => { setAppState(prev => prev ? ({ ...prev, evolution: { ...(prev.evolution as EvolutionState), startDateLevel2: new Date().toISOString() } }) : null); showToast("Nível 2 Iniciado. Sem volta."); };
+  const handleCompleteEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; if (!currentCompleted.includes(day)) { showToast(`Nível 2: Desafio do Dia ${day} Concluído!`); return { ...prev, evolution: { ...(prev.evolution as EvolutionState), completedDaysLevel2: [...currentCompleted, day], lastCompletionDateLevel2: new Date().toISOString() } }; } return prev; }); };
+  const handleUndoEvolutionDayLevel2 = (day: number) => { setAppState(prev => { if(!prev) return null; const currentCompleted = prev.evolution?.completedDaysLevel2 || []; return { ...prev, evolution: { ...(prev.evolution as EvolutionState), completedDaysLevel2: currentCompleted.filter(d => d !== day) } }; }); };
+  const handleStartLevel3 = () => { setAppState(prev => { if(!prev) return null; const currentEvol = prev.evolution || { completedDays: [] }; const newL3State = { isStarted: true, startDate: new Date().toISOString(), completedDays: [], lastCompletionDate: null }; return { ...prev, evolution: { ...(currentEvol as EvolutionState), level3: newL3State } }; }); showToast("Nível 3 Iniciado. Boa sorte."); };
+  const handleCompleteEvolutionDayLevel3 = (day: number) => { setAppState(prev => { if(!prev || !prev.evolution || !prev.evolution.level3) return null; const l3 = prev.evolution.level3; if (!l3.completedDays.includes(day)) { if(day === 40) showToast("Execução comprovada. Você passou."); else showToast(`Nível 3: Dia ${day} Vencido.`); return { ...prev, evolution: { ...(prev.evolution as EvolutionState), level3: { ...l3, completedDays: [...l3.completedDays, day], lastCompletionDate: new Date().toISOString() } } }; } return prev; }); };
 
   // Note, Doc, Media Handlers...
   const handleAddNote = (note: Note) => { setAppState(prev => { if(!prev) return null; const currentNotes = prev.notes || []; return { ...prev, notes: [note, ...currentNotes] }; }); };
@@ -978,7 +989,15 @@ function App() {
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
       <RoutineCreator isOpen={showRoutineCreator} onClose={() => setShowRoutineCreator(false)} onCreate={addRoutine} goals={appState.goals} />
-      <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => { setSelectedRoutineForDetails(null); setIsRoutineDetailsReadOnly(false); }} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} readOnly={isRoutineDetailsReadOnly} />
+      <RoutineDetailsModal 
+        isOpen={!!selectedRoutineForDetails} 
+        onClose={() => { setSelectedRoutineForDetails(null); setIsRoutineDetailsReadOnly(false); }} 
+        routine={selectedRoutineForDetails} 
+        onUpdateRoutine={handleUpdateRoutine} 
+        readOnly={isRoutineDetailsReadOnly} 
+        isCompletedToday={selectedRoutineForDetails ? todayLog?.completedRoutineIds.includes(selectedRoutineForDetails.id) : false}
+        onCompleteToday={() => selectedRoutineForDetails && toggleRoutineForToday(selectedRoutineForDetails.id)}
+      />
       <GoalDetailsModal isOpen={!!selectedGoalForDetails} onClose={() => { setSelectedGoalForDetails(null); setIsGoalDetailsReadOnly(false); }} goal={selectedGoalForDetails} onUpdateGoal={handleUpdateGoal} readOnly={isGoalDetailsReadOnly} />
 
       {/* MOBILE NAV OVERLAY */}

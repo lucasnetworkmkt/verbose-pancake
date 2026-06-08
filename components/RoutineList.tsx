@@ -2,7 +2,7 @@ import React from 'react';
 import { parseISO, getDay } from 'date-fns';
 import { Routine, Priority, DayLog, DayOfWeek } from '../types';
 import { getPriorityBorderClass, getPriorityColor } from '../constants';
-import { Check, Clock, Settings, List, Trash2 } from 'lucide-react';
+import { Check, Clock, Settings, List, Trash2, Star, ExternalLink } from 'lucide-react';
 
 interface RoutineListProps {
   routines: Routine[];
@@ -11,9 +11,11 @@ interface RoutineListProps {
   onOpenDetails?: (routine: Routine) => void; 
   dateStr: string;
   onDelete?: (routineId: string) => void;
+  isDashboard?: boolean;
+  onToggleMain?: (routineId: string) => void;
 }
 
-const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, onToggle, onOpenDetails, dateStr, onDelete }) => {
+const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, onToggle, onOpenDetails, dateStr, onDelete, isDashboard, onToggleMain }) => {
   const completedIds = currentLog?.completedRoutineIds || [];
   
   const dayIndex = getDay(parseISO(dateStr)); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -109,36 +111,72 @@ const RoutineList: React.FC<RoutineListProps> = ({ routines = [], currentLog, on
 
             {/* Actions Container - Isolated z-index */}
             <div className="flex items-center gap-0 md:gap-1 z-10 shrink-0 ml-1">
-                {/* Config Button */}
-                {onOpenDetails && (
-                    <button 
-                        type="button"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenDetails(routine);
-                        }}
-                        className="p-1.5 md:p-2 text-app-subtext hover:text-app-text hover:bg-app-hover rounded transition-colors"
-                        title="Detalhes"
-                    >
-                        <Settings size={16} className="md:w-[18px] md:h-[18px]" />
-                    </button>
-                )}
-                
-                {/* Delete Button */}
-                {onDelete && (
-                    <button 
-                        type="button"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onDelete(routine.id);
-                        }}
-                        className="p-1.5 md:p-2 text-app-subtext hover:text-app-red hover:bg-app-red/10 rounded transition-colors"
-                        title="Excluir Rotina"
-                    >
-                        <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
-                    </button>
+                {isDashboard ? (
+                    onOpenDetails && (
+                        <button 
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onOpenDetails(routine);
+                            }}
+                            className="bg-app-red hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs md:text-sm font-bold uppercase transition-colors flex items-center gap-1.5"
+                            title="Acessar"
+                        >
+                            <ExternalLink size={14} className="md:w-4 md:h-4" />
+                            Acessar
+                        </button>
+                    )
+                ) : (
+                    <>
+                        {/* Main Routine Toggle Button */}
+                        {onToggleMain && (
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onToggleMain(routine.id);
+                                }}
+                                className={`p-1.5 md:p-2 rounded transition-colors ${routine.isMain ? 'text-app-gold' : 'text-app-subtext hover:text-app-gold hover:bg-app-hover'}`}
+                                title={routine.isMain ? "Rotina Principal" : "Marcar como Principal"}
+                            >
+                                <Star size={16} className={`md:w-[18px] md:h-[18px] ${routine.isMain ? 'fill-current' : ''}`} />
+                            </button>
+                        )}
+                        
+                        {/* Config Button */}
+                        {onOpenDetails && (
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onOpenDetails(routine);
+                                }}
+                                className="p-1.5 md:p-2 text-app-subtext hover:text-app-text hover:bg-app-hover rounded transition-colors"
+                                title="Detalhes"
+                            >
+                                <Settings size={16} className="md:w-[18px] md:h-[18px]" />
+                            </button>
+                        )}
+                        
+                        {/* Delete Button */}
+                        {onDelete && (
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onDelete(routine.id);
+                                }}
+                                className="p-1.5 md:p-2 text-app-subtext hover:text-app-red hover:bg-app-red/10 rounded transition-colors"
+                                title="Excluir Rotina"
+                            >
+                                <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
           </div>

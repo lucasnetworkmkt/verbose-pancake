@@ -431,6 +431,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedRoutineForDetails, setSelectedRoutineForDetails] = useState<Routine | null>(null);
+  const [isRoutineDetailsReadOnly, setIsRoutineDetailsReadOnly] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
 
   useEffect(() => {
@@ -594,6 +595,7 @@ function App() {
             category, 
             frequency: 'DAILY', 
             linkedGoalId: goalId, 
+            isMain: false,
             routineTasks: {
                 [DayOfWeek.MONDAY]: [],
                 [DayOfWeek.TUESDAY]: [],
@@ -606,6 +608,16 @@ function App() {
         };
         return { ...prev, routines: [...(prev.routines || []), newRoutine] };
     });
+  };
+
+  const toggleMainRoutine = (routineId: string) => {
+      setAppState(prev => {
+          if (!prev) return null;
+          return {
+              ...prev,
+              routines: prev.routines.map(r => r.id === routineId ? { ...r, isMain: !r.isMain } : r)
+          };
+      });
   };
 
   const deleteRoutine = (id: string) => {
@@ -870,7 +882,7 @@ function App() {
       <CheckInModal isOpen={showCheckIn} onClose={handleCheckInComplete} username={appState.user?.username || ''} />
       <GoalCreator isOpen={showGoalCreator} onClose={() => setShowGoalCreator(false)} onCreate={handleCreateGoal} />
       <RoutineCreator isOpen={showRoutineCreator} onClose={() => setShowRoutineCreator(false)} onCreate={addRoutine} goals={appState.goals} />
-      <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => setSelectedRoutineForDetails(null)} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} />
+      <RoutineDetailsModal isOpen={!!selectedRoutineForDetails} onClose={() => { setSelectedRoutineForDetails(null); setIsRoutineDetailsReadOnly(false); }} routine={selectedRoutineForDetails} onUpdateRoutine={handleUpdateRoutine} readOnly={isRoutineDetailsReadOnly} />
 
       {/* MOBILE NAV OVERLAY */}
       {isMobileMenuOpen && (
@@ -1008,19 +1020,26 @@ function App() {
                 {/* Today's Routines */}
                 <div>
                    <div className="flex items-center justify-between mb-3 md:mb-4">
-                       <h3 className="text-base md:text-xl font-bold text-app-text">Rotinas de Hoje</h3>
+                       <h3 className="text-base md:text-xl font-bold text-app-text">Rotinas da Execução (Principais)</h3>
                        <span className="text-[10px] md:text-xs text-app-subtext bg-app-card px-2 py-1 rounded">
-                           {todayLog?.completedRoutineIds.length || 0} / {appState.routines.length}
+                           {appState.routines.filter(r => r.isMain).length === 0 ? 'Nenhuma Principal' : `${todayLog?.completedRoutineIds.length || 0} / ${appState.routines.filter(r => r.isMain).length}`}
                        </span>
                    </div>
-                   <RoutineList 
-                     routines={appState.routines}
-                     currentLog={todayLog}
-                     onToggle={toggleRoutineForToday}
-                     onOpenDetails={setSelectedRoutineForDetails}
-                     dateStr={todayStr}
-                     onDelete={deleteRoutine}
-                   />
+                   {appState.routines.filter(r => r.isMain).length === 0 ? (
+                       <div className="bg-app-card border border-app-border rounded-lg p-6 text-center text-app-subtext">
+                           <p className="text-sm">Você ainda não escolheu nenhuma Rotina Principal.</p>
+                           <p className="text-xs mt-2 opacity-70">Acesse a aba <strong>Rotinas</strong> e marque a(s) rotina(s) que você usa no dia a dia com a <strong>Estrela</strong> para exibi-las aqui.</p>
+                       </div>
+                   ) : (
+                       <RoutineList 
+                         routines={appState.routines.filter(r => r.isMain)}
+                         currentLog={todayLog}
+                         onToggle={toggleRoutineForToday}
+                         onOpenDetails={(r) => { setSelectedRoutineForDetails(r); setIsRoutineDetailsReadOnly(true); }}
+                         dateStr={todayStr}
+                         isDashboard={true}
+                       />
+                   )}
                 </div>
               </div>
 
@@ -1110,7 +1129,15 @@ function App() {
                  </div>
                  
                  <div className="space-y-2">
-                     <RoutineList routines={appState.routines} currentLog={todayLog} onToggle={(id) => {}} onOpenDetails={setSelectedRoutineForDetails} dateStr={todayStr} onDelete={deleteRoutine} />
+                     <RoutineList 
+                         routines={appState.routines} 
+                         currentLog={todayLog} 
+                         onToggle={(id) => {}} 
+                         onOpenDetails={(r) => { setSelectedRoutineForDetails(r); setIsRoutineDetailsReadOnly(false); }} 
+                         dateStr={todayStr} 
+                         onDelete={deleteRoutine} 
+                         onToggleMain={toggleMainRoutine}
+                     />
                  </div>
              </div>
           )}

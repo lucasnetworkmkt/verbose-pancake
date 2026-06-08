@@ -148,10 +148,10 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4">
-      <div className="w-full h-full md:h-[95vh] md:max-w-6xl bg-app-card border border-app-border rounded-none md:rounded-xl shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-app-bg items-center">
+      <div className="w-full h-full max-w-[1920px] bg-app-bg flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-start p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 rounded-t-none md:rounded-t-xl">
+        <div className="flex justify-between items-start p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 w-full">
           <div className="min-w-0 pr-2">
             <h2 className="text-base md:text-2xl font-bold text-app-text uppercase tracking-wider break-words leading-tight">{routine.title}</h2>
             <p className="text-app-subtext text-[10px] md:text-sm truncate">Microtarefas e Execução Detalhada</p>

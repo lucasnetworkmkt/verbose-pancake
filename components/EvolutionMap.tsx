@@ -109,14 +109,6 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
       setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const formatWaitTime = (targetTime: number) => {
-      const diff = targetTime - currentTime;
-      if (diff <= 0) return "";
-      const h = Math.floor(diff / (1000 * 60 * 60));
-      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      return `${h}h ${m}m`;
-  };
-
   const getPosition = (index: number) => {
     const yBase = index * 100;
     const xBase = 50;
@@ -316,7 +308,6 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
   
   // Apenas calculamos unlock time pro próximo dia sequencial, pro resto fica travado ou já concluído.
   const unlockTimeMs = getNextUnlockTime(activeLastCompletionDate, activeStartDate);
-  const waitText = unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
 
   return (
     <div className="relative w-full h-full flex flex-col bg-app-bg">
@@ -383,8 +374,6 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                 const isWaiting = isNextSequential && !nodeTimeAllowed;
                 const isLocked = day > nextSequential;
 
-                const nodeWaitText = isWaiting && unlockTimeMs ? formatWaitTime(unlockTimeMs) : "";
-
                 return (
                     <div 
                         key={day}
@@ -410,7 +399,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                         )}
                         {isWaiting && (
                             <div className="absolute top-full mt-2 bg-app-input border border-app-border text-app-subtext text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap z-20">
-                                {nodeWaitText}
+                                Desbloqueia amanhã
                             </div>
                         )}
                     </div>
@@ -502,7 +491,7 @@ const EvolutionMap: React.FC<EvolutionMapProps> = ({
                             {isTimeLocked ? (
                                 <>
                                     <Clock size={16} />
-                                    <span>Desbloqueia em {waitText}</span>
+                                    <span>Desbloqueia amanhã</span>
                                 </>
                             ) : (
                                 <span>Dia Anterior Pendente</span>

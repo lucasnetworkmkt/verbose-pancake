@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, isToday, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   LayoutDashboard, 
@@ -1102,6 +1102,9 @@ function App() {
                         {['D','S','T','Q','Q','S','S'].map((d,i) => <div key={i}>{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1">
+                        {Array.from({ length: getDay(startOfCurrentMonth) }).map((_, i) => (
+                            <div key={`empty-${i}`} className="aspect-square"></div>
+                        ))}
                         {eachDayOfInterval({ start: startOfCurrentMonth, end: endOfMonth(new Date()) }).map(day => {
                             const dStr = format(day, 'yyyy-MM-dd');
                             const log = appState.dayLogs[dStr];
@@ -1120,12 +1123,17 @@ function App() {
                     {appState.goals.length === 0 ? <p className="text-app-subtext text-xs italic">Nenhuma meta ativa.</p> : (
                         <div className="space-y-3 md:space-y-4">
                             {appState.goals.slice(0, 3).map(goal => (
-                                <div key={goal.id} className={`border-l-2 pl-3 ${getPriorityBorderClass(goal.priority).replace('border-l-4', 'border-l-2')}`}>
+                                <div 
+                                    key={goal.id} 
+                                    className={`border-l-2 pl-3 py-1 cursor-pointer hover:bg-app-hover rounded transition-colors ${getPriorityBorderClass(goal.priority).replace('border-l-4', 'border-l-2')}`}
+                                    onClick={() => { setSelectedGoalForDetails(goal); setIsGoalDetailsReadOnly(true); }}
+                                    title="Acessar Meta"
+                                >
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-app-text font-medium text-xs md:text-sm break-words">{goal.title}</span>
                                         <span className="text-[9px] md:text-[10px] bg-black border border-gray-700 px-1 rounded text-gray-400 whitespace-nowrap ml-2">{goal.deadline.slice(5)}</span>
                                     </div>
-                                    <div className="w-full bg-app-input h-1 rounded-full mt-2"><div className="bg-app-gold h-1 rounded-full" style={{ width: `${goal.tasks.length > 0 ? (goal.tasks.filter(t => t.isCompleted).length / goal.tasks.length) * 100 : 0}%`}}></div></div>
+                                    <div className="w-full bg-app-input h-1 rounded-full mt-2"><div className="bg-app-gold h-1 rounded-full border border-app-border" style={{ width: `${goal.tasks.length > 0 ? (goal.tasks.filter(t => t.isCompleted).length / goal.tasks.length) * 100 : 0}%`}}></div></div>
                                 </div>
                             ))}
                         </div>

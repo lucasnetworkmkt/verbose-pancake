@@ -169,9 +169,11 @@ export interface Level3State {
 export interface EvolutionState {
   completedDays: number[];
   startDate?: string | null;
+  lastCompletionDate?: string | null; // Novo
   
   completedDaysLevel2?: number[];
   startDateLevel2?: string | null;
+  lastCompletionDateLevel2?: string | null; // Novo
 
   level3?: Level3State;
 }

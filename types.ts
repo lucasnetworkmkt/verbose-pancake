@@ -56,6 +56,7 @@ export interface Routine {
   frequency: 'DAILY' | 'WEEKLY';
   linkedGoalId?: string;
   routineTasks?: Record<DayOfWeek, RoutineTask[]>;
+  isMain?: boolean;
 }
 
 export interface Goal {

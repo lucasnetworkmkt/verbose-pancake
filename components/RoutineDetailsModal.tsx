@@ -7,9 +7,10 @@ interface RoutineDetailsModalProps {
   onClose: () => void;
   routine: Routine | null;
   onUpdateRoutine: (updatedRoutine: Routine) => void;
+  readOnly?: boolean;
 }
 
-const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClose, routine, onUpdateRoutine }) => {
+const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClose, routine, onUpdateRoutine, readOnly }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('08:00');
   const [activeBlock, setActiveBlock] = useState<TimeBlock>(TimeBlock.MORNING);
@@ -151,10 +152,9 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
     <div className="fixed inset-0 z-[60] flex flex-col bg-app-bg items-center">
       <div className="w-full h-full max-w-[1920px] bg-app-bg flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-start p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 w-full">
+        <div className="flex justify-between items-center p-4 md:p-6 border-b border-app-border shrink-0 bg-app-card z-10 w-full">
           <div className="min-w-0 pr-2">
             <h2 className="text-base md:text-2xl font-bold text-app-text uppercase tracking-wider break-words leading-tight">{routine.title}</h2>
-            <p className="text-app-subtext text-[10px] md:text-sm truncate">Microtarefas e Execução Detalhada</p>
           </div>
           <button onClick={onClose} className="text-app-subtext hover:text-app-text transition-colors p-1 shrink-0">
             <X size={20} className="md:w-6 md:h-6" />
@@ -174,32 +174,36 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                     </button>
                 ))}
             </div>
-            <button 
-                onClick={() => setIsCopying(!isCopying)}
-                className="text-xs text-app-gold underline hover:text-app-text self-start"
-            >
-                {isCopying ? 'Cancelar Cópia' : 'Copiar tarefas deste dia para outros'}
-            </button>
-            
-            {isCopying && (
-                <div className="flex flex-wrap gap-2 p-2 bg-app-input rounded border border-app-border">
-                    <span className="text-xs text-app-subtext w-full">Selecione os dias de destino:</span>
-                    {Object.values(DayOfWeek).filter(d => d !== activeDay).map(day => (
-                        <button
-                            key={day}
-                            onClick={() => setTargetDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])}
-                            className={`px-2 py-1 text-xs rounded transition-colors ${targetDays.includes(day) ? 'bg-app-red text-white' : 'bg-app-card text-app-subtext'}`}
-                        >
-                            {dayLabels[day]}
-                        </button>
-                    ))}
+            {!readOnly && (
+                <>
                     <button 
-                        onClick={handleCopyDay}
-                        className="px-3 py-1 text-xs bg-app-gold text-black font-bold rounded hover:bg-yellow-600 transition-colors"
+                        onClick={() => setIsCopying(!isCopying)}
+                        className="text-xs text-app-gold underline hover:text-app-text self-start"
                     >
-                        Confirmar Cópia
+                        {isCopying ? 'Cancelar Cópia' : 'Copiar tarefas deste dia para outros'}
                     </button>
-                </div>
+                    
+                    {isCopying && (
+                        <div className="flex flex-wrap gap-2 p-2 bg-app-input rounded border border-app-border">
+                            <span className="text-xs text-app-subtext w-full">Selecione os dias de destino:</span>
+                            {Object.values(DayOfWeek).filter(d => d !== activeDay).map(day => (
+                                <button
+                                    key={day}
+                                    onClick={() => setTargetDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])}
+                                    className={`px-2 py-1 text-xs rounded transition-colors ${targetDays.includes(day) ? 'bg-app-red text-white' : 'bg-app-card text-app-subtext'}`}
+                                >
+                                    {dayLabels[day]}
+                                </button>
+                            ))}
+                            <button 
+                                onClick={handleCopyDay}
+                                className="px-3 py-1 text-xs bg-app-gold text-black font-bold rounded hover:bg-yellow-600 transition-colors"
+                            >
+                                Confirmar Cópia
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
 
@@ -235,18 +239,22 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                     {blockTasks.map(task => (
                       <div key={task.id} className="group bg-app-card border border-app-border p-2 rounded flex items-start gap-2 hover:border-app-subtext transition-colors">
                         <div className="flex flex-col gap-1">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'up'); }}
-                            className="text-app-subtext hover:text-app-text"
-                          >
-                            ▲
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'down'); }}
-                            className="text-app-subtext hover:text-app-text"
-                          >
-                            ▼
-                          </button>
+                          {!readOnly && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'up'); }}
+                                className="text-app-subtext hover:text-app-text"
+                              >
+                                ▲
+                              </button>
+                          )}
+                          {!readOnly && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); reorderTask(task.id, 'down'); }}
+                                className="text-app-subtext hover:text-app-text"
+                              >
+                                ▼
+                              </button>
+                          )}
                         </div>
                         
                         <button 
@@ -260,41 +268,48 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                           <p className={`text-xs md:text-sm break-words leading-tight ${task.isCompleted ? 'text-app-subtext line-through' : 'text-app-text'}`}>
                             {task.title}
                           </p>
-                          <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                              <Clock size={10} className="text-app-red shrink-0"/>
-                             <input 
-                                type="time"
-                                value={task.time}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => updateTaskTime(task.id, e.target.value)}
-                                className="bg-transparent text-[10px] md:text-xs text-app-subtext w-16 outline-none hover:text-app-text focus:text-app-gold p-0 cursor-pointer"
-                             />
+                             {readOnly ? (
+                                <span className="text-[10px] md:text-xs text-app-subtext">{task.time}</span>
+                             ) : (
+                                 <input 
+                                    type="time"
+                                    value={task.time}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => updateTaskTime(task.id, e.target.value)}
+                                    className="bg-transparent text-[10px] md:text-xs text-app-subtext w-16 outline-none hover:text-app-text focus:text-app-gold p-0 cursor-pointer"
+                                 />
+                             )}
                           </div>
                         </div>
 
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                          className="text-app-subtext hover:text-app-red transition-colors p-0.5 md:p-1 mt-0.5"
-                          title="Excluir"
-                        >
-                          <Trash2 size={14} className="md:w-4 md:h-4" />
-                        </button>
+                        {!readOnly && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                              className="text-app-subtext hover:text-app-red transition-colors p-0.5 md:p-1 mt-0.5"
+                              title="Excluir"
+                            >
+                              <Trash2 size={14} className="md:w-4 md:h-4" />
+                            </button>
+                        )}
                       </div>
                     ))}
                   </div>
 
                   {/* Add Input */}
-                  <div className={`p-2 border-t border-app-border shrink-0 ${isSelected ? 'bg-app-card/50' : ''}`}>
-                    <form onSubmit={handleAddTask} className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        placeholder={isSelected ? "Nova tarefa..." : "Editar"}
-                        className="flex-1 min-w-0 bg-transparent text-xs text-app-text placeholder-app-subtext outline-none py-2"
-                        value={isSelected ? newTaskTitle : ''}
-                        onChange={e => setNewTaskTitle(e.target.value)}
-                        disabled={!isSelected}
-                        onFocus={() => setActiveBlock(block)}
-                      />
+                  {!readOnly && (
+                      <div className={`p-2 border-t border-app-border shrink-0 ${isSelected ? 'bg-app-card/50' : ''}`}>
+                        <form onSubmit={handleAddTask} className="flex gap-2 items-center">
+                          <input 
+                            type="text" 
+                            placeholder={isSelected ? "Nova tarefa..." : "Editar"}
+                            className="flex-1 min-w-0 bg-transparent text-xs text-app-text placeholder-app-subtext outline-none py-2"
+                            value={isSelected ? newTaskTitle : ''}
+                            onChange={e => setNewTaskTitle(e.target.value)}
+                            disabled={!isSelected}
+                            onFocus={() => setActiveBlock(block)}
+                          />
                        {isSelected && (
                          <div className="flex items-center gap-1 shrink-0">
                             <input 
@@ -308,8 +323,9 @@ const RoutineDetailsModal: React.FC<RoutineDetailsModalProps> = ({ isOpen, onClo
                             </button>
                          </div>
                        )}
-                    </form>
-                  </div>
+                        </form>
+                      </div>
+                  )}
                 </div>
               );
             })}
